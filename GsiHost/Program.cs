@@ -9,6 +9,7 @@ using Core.Stores;
 using Core.Adapters;
 using GsiHost.Adapters;
 using GsiHost.Configuration;
+using GsiHost.Diagnostics;
 using GsiHost.Dtos;
 using GsiHost.Endpoints;
 using GsiHost.Mapping;
@@ -88,10 +89,14 @@ builder.Services.AddSingleton<MediaPlayerDisplayNameCatalog>();
 builder.Services.AddSingleton<MusicLastCommandStore>();
 builder.Services.AddSingleton<MusicOnboardingService>();
 builder.Services.AddSingleton<MusicPlaybackControlCoordinator>();
+builder.Services.AddSingleton<LocalGoNoGoCounterStore>();
 builder.Services.AddSingleton<IMusicPlaybackControl>(sp =>
-    new RecordingMusicPlaybackControl(
-        sp.GetRequiredService<MusicPlaybackControlCoordinator>(),
-        sp.GetRequiredService<MusicLastCommandStore>(),
+    new CountingMusicPlaybackControl(
+        new RecordingMusicPlaybackControl(
+            sp.GetRequiredService<MusicPlaybackControlCoordinator>(),
+            sp.GetRequiredService<MusicLastCommandStore>(),
+            sp.GetRequiredService<IOptions<SmtcOptions>>()),
+        sp.GetRequiredService<LocalGoNoGoCounterStore>(),
         sp.GetRequiredService<IOptions<SmtcOptions>>()));
 
 builder.Services.Configure<RulesEngineOptions>(
@@ -116,6 +121,8 @@ builder.Services.Configure<TauonOptions>(
     builder.Configuration.GetSection(TauonOptions.SectionName));
 builder.Services.Configure<SmtcOptions>(
     builder.Configuration.GetSection(SmtcOptions.SectionName));
+builder.Services.Configure<LocalGoNoGoCounterOptions>(
+    builder.Configuration.GetSection(LocalGoNoGoCounterOptions.SectionName));
 
 var app = builder.Build();
 app.Logger.LogInformation("Music provider: {Provider}", resolvedMusicProvider.CanonicalName);
@@ -273,6 +280,7 @@ app.MapGet("/diagnostics/adapters", (IGameAdapterRouter router) =>
 // other endpoint (or reset) touched the singleton.
 _ = app.Services.GetRequiredService<AppStateService>();
 _ = app.Services.GetRequiredService<TimelineCaptureService>();
+_ = app.Services.GetRequiredService<LocalGoNoGoCounterStore>();
 
 app.Run();
 
