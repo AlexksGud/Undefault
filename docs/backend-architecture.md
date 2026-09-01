@@ -1,6 +1,6 @@
 # Backend Architecture
 
-> **WARNING — mixed current vs leftover.** GSI, mapping, rules, and simulator sections below still describe the live pipeline. The **music/device path has pivoted** (`IMusicPlaybackControl` → `IMusicPlayer` → Tauon/Mock; `round_start → resume`, `death → pause`). Leftover Spotify OAuth/`ISpotifyClient` types remain until `PIVOT-10` and must not be treated as the product backend.
+> **WARNING — mixed current vs leftover.** GSI, mapping, rules, and simulator sections below still describe the live pipeline. The **music/device path has pivoted** (`IMusicPlaybackControl` → `IMusicPlayer` → Tauon/Mock; `round_start → resume`, `death → pause`). Leftover `ISpotifyClient` types remain until `PIVOT-10` and must not be treated as the product backend; the OAuth layer behind them was deleted in UND-84.
 >
 > **Authoritative music path:**
 > - [product-pivot-2026-08-14.md](product-pivot-2026-08-14.md)
@@ -18,7 +18,7 @@ What `main` does today:
 - CS2 Game State Integration posts to the local backend
 - live playback goes through `IMusicPlayer` (Tauon default, Mock for `--quick`)
 - default gameplay automation is `round_start -> resume` and `death -> pause`
-- leftover Spotify OAuth/`ISpotifyClient` types remain until `PIVOT-10`
+- leftover `ISpotifyClient` types remain until `PIVOT-10` (OAuth deleted in UND-84)
 - further behavior is expressed through `RulesEngine.ActionMap` and `control-profiles.json`
 
 ## High-Level Solution Shape
@@ -59,39 +59,26 @@ Startup order:
 5. host build
 6. automatic CS2 setup via `EnsureCs2SetupAsync()`
 7. Smart Track Start warm-up via `WarmSmartTrackStartAsync()`
-8. Spotify authorization URL logging
-9. console startup checklist output
-10. endpoint mapping and `app.Run()`
+8. console startup checklist output
+9. endpoint mapping and `app.Run()`
 
 This matters because the console bootstrap injects runtime overrides before most of the host is configured.
 
-## Console Bootstrap And Secret Handling
+## Console Bootstrap
 
 `GsiHost/Services/ConsoleLaunchBootstrap.cs` is the console-first startup shim.
 
 Its current responsibilities:
 
 - normalize the GSI base URL
-- normalize the Spotify redirect URI
-- leftover Spotify is mock unless `--use-real-spotify`
-- resolve Spotify client credentials from multiple sources
-- support `--reset-spotify-secrets` and `--clear-spotify-secrets`
-- persist app credentials in encrypted local storage on Windows
+- resolve `Music:Provider` from `--quick` / `--use-mock-spotify` and configuration
+- resolve the runtime mode from `--intent-capture` / `--scenario-playback` / `--mvp`
 - apply config overrides in memory without mutating git-tracked files
 - bind Kestrel to the chosen local URL with `builder.WebHost.UseUrls(...)`
 
-Credential precedence is:
-
-1. environment variables `CLIENT_ID` and `CLIENT_SECRET`
-2. encrypted local secret store
-3. `appsettings.json`
-4. interactive console prompt if credentials are still missing or reset is requested
-
-Current limitations:
-
-- encrypted local secret storage is Windows-only
-- access tokens are not persisted across process restarts
-- the backend still depends on a real active Spotify playback device for playback control
+UND-84 deleted the credential half of this shim. There is no credential
+resolution, no interactive prompt, and no encrypted secret store; the leftover
+`ISpotifyClient` always resolves to `MockSpotifyClient`.
 
 ## Configuration And File Model
 
@@ -209,7 +196,7 @@ The backend is currently a Minimal API host with these main routes:
 | `GET` | `/events` | recent normalized events |
 | `GET` | `/timeline` | recent unified timeline (GSI + playback + dota) — **intent_capture only** |
 | `GET` | `/timeline/episodes` | intent-episode windows (reserved — empty until a future intent source is added) — **intent_capture only** |
-| `GET` | `/spotify/status` | Spotify auth/runtime diagnostics |
+| `GET` | `/spotify/status` | leftover diagnostics; credential/token fields are constants since UND-84 removed the OAuth layer |
 | `GET` | `/config` | read editable system config |
 | `PUT` | `/config` | save editable system config |
 | `GET` | `/control-profiles` | read console control profiles |
@@ -218,9 +205,6 @@ The backend is currently a Minimal API host with these main routes:
 | `PUT` | `/profiles` | save legacy track profiles |
 | `GET` | `/setup/cs2/status` | read CS2 setup state |
 | `POST` | `/setup/cs2/install` | install or update the CS2 GSI cfg |
-| `GET` | `/spotify/authorize` | produce an authorization URL in real mode |
-| `GET` | `/callback` | OAuth callback endpoint |
-| `GET` | `/spotify/callback` | alternate OAuth callback endpoint |
 | `GET` | `/diagnostics/music-shadow` | debug-only inspection of the Phase A music orchestration facade shadow output (UND-22) |
 | `GET` | `/diagnostics/adapters` | debug-only inspection of registered game adapters (`IGameAdapterRouter`); see [multi-adapter-routing.md](multi-adapter-routing.md) |
 
@@ -231,7 +215,7 @@ See [manual-intent-timeline.md](manual-intent-timeline.md) for timeline storage,
 `GsiHost` runs as a single process and serves one HTTP endpoint per
 title. CS2 posts to `/gsi`; future titles add their own typed
 endpoint and adapter alongside CS2 without changing the CS2 path.
-The host owns one shared Spotify/OAuth/facade pipeline used by every
+The host owns one shared playback/facade pipeline used by every
 title.
 
 `Core/Adapters/IGameAdapterRouter` is the metadata registry of which
@@ -452,65 +436,28 @@ Current implementation:
 - entries are indexed by both track URI and parsed Spotify track id
 - `WarmAsync()` can preload the active track profile catalog and log how many tracks have metadata
 - `ResolveStartPositionMsAsync()` returns a nullable offset
-- `SpotifyClient.PlayAsync(...)` can include `position_ms` in the same play request
+- `ISpotifyClient.PlayAsync(...)` can include `position_ms` in the same play request
 
 Current scope:
 
 - Smart Track Start applies to backend track playback such as `spotify.profile`
 - it does not apply to console control-profile commands like `pause`, `resume`, `duck`, or `restore_volume`
 
-## Spotify Runtime Modes
+## Spotify Runtime Mode
 
-The host supports two Spotify runtime modes.
+There is one mode. UND-84 deleted `SpotifyOAuthService`, `SpotifyClient`, token
+storage, and the encrypted secret store, so `ISpotifyClient` always resolves to
+`MockSpotifyClient`.
 
-### Real Mode
+In this mode:
 
-Real mode uses:
+- the host runs normally and GSI ingestion works
+- profile/config/setup endpoints work
+- leftover Spotify playback operations are loggable no-ops
+- `/spotify/status` reports `IsAuthenticated: false` and constant credential fields
 
-- Spotify Web API
-- OAuth authorization code flow
-- encrypted local storage for Spotify app credentials
-- in-memory token storage for access and refresh tokens
-
-Current behavior:
-
-- `/spotify/authorize` returns an authorization URL
-- `/callback` and `/spotify/callback` complete the OAuth flow
-- `SpotifyClient` refreshes the access token when it is close to expiry
-
-Important runtime constraints:
-
-- playback control requires Spotify Premium
-- playback control requires an active playback device
-- token storage is still process-local, so auth must be repeated after restart
-
-### Mock Mode
-
-Mock mode uses `MockSpotifyClient`.
-
-In mock mode:
-
-- the host still runs normally
-- GSI ingestion still works
-- profile/config/setup endpoints still work
-- OAuth endpoints return an unavailable response
-- playback operations become loggable no-op behavior
-
-## Spotify Client Details
-
-`Core/Spotify/SpotifyClient.cs` currently supports:
-
-- current playback lookup via `GET /v1/me/player`
-- play via `PUT /v1/me/player/play`
-- pause via `PUT /v1/me/player/pause`
-- resume via `PUT /v1/me/player/play`
-- volume changes via `PUT /v1/me/player/volume`
-
-Current play behavior:
-
-- accepts optional `uri`
-- accepts optional `positionMs`
-- serializes `position_ms` into the same request body when Smart Track Start provides an offset
+Real playback goes through `IMusicPlayer` (Tauon or `MockMusicPlayer`), not
+through this leftover path.
 
 ## CS2 Setup Service
 
@@ -609,7 +556,6 @@ Current backend tests focus on:
 - Smart Track Start enabled, disabled, and fallback behavior
 - host endpoints
 - CS2 setup installation/status behavior
-- Spotify OAuth callback behavior
 - console bootstrap behavior
 
 Build and test run automatically on every pull request and push to `main` via
@@ -622,7 +568,6 @@ failed-test logs.
 The following are intentionally not solved yet:
 
 - Dota 2 support
-- persistent OAuth token storage across process restarts
 - advanced multi-game orchestration
 - large rule-authoring UX
 - push-based UI updates

@@ -86,20 +86,4 @@ public sealed class MockSpotifyClient : ISpotifyClient
     {
         return Task.FromResult(false);
     }
-
-    public Task<string> GetAuthorizationUrlAsync(string state, CancellationToken cancellationToken = default)
-    {
-        return Task.FromResult("https://mock.spotify/authorize");
-    }
-
-    public Task<SpotifyAuthResult> AuthenticateAsync(string authorizationCode, string state, CancellationToken cancellationToken = default)
-    {
-        var result = new SpotifyAuthResult(
-            AccessToken: "mock-access-token",
-            RefreshToken: "mock-refresh-token",
-            ExpiresAt: DateTimeOffset.UtcNow.AddHours(1),
-            Scopes: Array.Empty<string>()
-        );
-        return Task.FromResult(result);
-    }
 }

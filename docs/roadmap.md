@@ -19,7 +19,7 @@ This file is the working backlog while Linear Undefault is not connected from th
 - Pipeline: CS2 GSI → adapter → detector → `RulesEngine` → `music.control_profile` (`spotify.control_profile` alias still registered)
 - Default rules: `round_start → resume`, `death → pause`
 - Device: `IMusicPlayer` (`TauonMusicPlayer` default, `MockMusicPlayer` for `--quick`)
-- Leftover Spotify types remain until `PIVOT-10`; leftover Spotify is mock unless `--use-real-spotify`
+- Leftover Spotify types remain until `PIVOT-10`; the OAuth/real-client layer was deleted in UND-84, so leftover Spotify is always the mock client
 - `--mvp` still means `intent_capture` observe+record (UND-64), not the Tauon product MVP
 - Dota: `POST /gsi/dota` logs only (UND-80)
 - Safety/mixer: shadow diagnostics only

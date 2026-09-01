@@ -390,8 +390,5 @@ public sealed class PlaybackStateObserverTests
         public Task PauseAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task ResumeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SetVolumeAsync(int volume, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<string> GetAuthorizationUrlAsync(string state, CancellationToken cancellationToken = default) => Task.FromResult(string.Empty);
-        public Task<SpotifyAuthResult> AuthenticateAsync(string authorizationCode, string state, CancellationToken cancellationToken = default)
-            => Task.FromResult(new SpotifyAuthResult(string.Empty, string.Empty, DateTimeOffset.UtcNow, Array.Empty<string>()));
     }
 }

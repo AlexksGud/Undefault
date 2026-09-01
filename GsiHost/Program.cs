@@ -78,7 +78,7 @@ builder.Services.AddSingleton<ISnapshotModuleMapper, CombatModuleMapper>();
 builder.Services.AddSingleton<ISnapshotModuleMapper, RoundModuleMapper>();
 
 BuildMusicPlayer(builder);
-BuildSpotify(builder);
+builder.Services.AddSingleton<ISpotifyClient, MockSpotifyClient>();
 
 builder.Services.AddSingleton<SpotifyPlaybackControlCoordinator>();
 builder.Services.AddSingleton<IMusicPlaybackControl>(sp =>
@@ -90,8 +90,6 @@ builder.Services.Configure<RulesEngineOptions>(
     builder.Configuration.GetSection("RulesEngine"));
 builder.Services.Configure<EventDetectorOptions>(
     builder.Configuration.GetSection("EventDetector"));
-builder.Services.Configure<SpotifyClientOptions>(
-    builder.Configuration.GetSection("Spotify"));
 builder.Services.Configure<VolumeDuckOptions>(
     builder.Configuration.GetSection("SpotifyVolumeDuck"));
 builder.Services.Configure<SmartTrackStartOptions>(
@@ -122,14 +120,6 @@ if (!string.Equals(resolvedMusicProvider, "Tauon", StringComparison.OrdinalIgnor
         resolvedMusicProvider);
 }
 
-if (consoleLaunchSettings.LegacyClientSecretEnvVarPresent)
-{
-    // UND-47: emit a one-time DEBUG line so testers know the env var is no longer
-    // needed. The value itself is never logged.
-    app.Logger.LogDebug(
-        "CLIENT_SECRET environment variable is set but is ignored — Spotify OAuth uses PKCE and does not require a client secret.");
-}
-
 if (!consoleLaunchSettings.SkipCs2Setup)
 {
     await EnsureCs2SetupAsync(app);
@@ -140,10 +130,7 @@ if (!consoleLaunchSettings.SkipSmartTrackWarmup)
     await WarmSmartTrackStartAsync(app);
 }
 
-var authorizationUrl = consoleLaunchSettings.HasSpotifyCredentials
-    ? LogSpotifyAuthorizationUrl(app)
-    : null;
-await WriteConsoleStartupChecklistAsync(app, consoleLaunchSettings, authorizationUrl);
+await WriteConsoleStartupChecklistAsync(app, consoleLaunchSettings);
 
 app.MapGet("/", () => "UndefaultIt GSI Host");
 
@@ -217,12 +204,11 @@ if (resolvedRuntime.IsIntentCapture)
     app.MapGet("/timeline/episodes", (TimelineCaptureService timeline) => Results.Ok((object?)timeline.GetIntentEpisodes()));
 }
 
-app.MapGet("/spotify/status", async (IServiceProvider services, CancellationToken cancellationToken) =>
+// UND-84: leftover surface. The OAuth layer is deleted, so ISpotifyClient is always the
+// mock and the credential/token fields are constants kept only for response-shape
+// compatibility until this endpoint is removed with the rest of the leftover.
+app.MapGet("/spotify/status", async (ISpotifyClient spotifyClient, CancellationToken cancellationToken) =>
 {
-    var spotifyClient = services.GetRequiredService<ISpotifyClient>();
-    var oauthService = services.GetService<SpotifyOAuthService>();
-    var tokenStorage = services.GetService<ITokenStorage>();
-
     bool isAuthenticated;
     try
     {
@@ -233,21 +219,14 @@ app.MapGet("/spotify/status", async (IServiceProvider services, CancellationToke
         isAuthenticated = false;
     }
 
-    var accessToken = tokenStorage is null
-        ? null
-        : await tokenStorage.GetAccessTokenAsync(cancellationToken);
-    var expiresAt = tokenStorage is null
-        ? null
-        : await tokenStorage.GetExpiresAtAsync(cancellationToken);
-
     return Results.Ok(new
     {
-        UseMockSpotify = oauthService is null || tokenStorage is null,
-        HasClientCredentials = oauthService?.HasClientCredentials ?? false,
-        RedirectUri = oauthService?.RedirectUri,
+        UseMockSpotify = true,
+        HasClientCredentials = false,
+        RedirectUri = (string?)null,
         IsAuthenticated = isAuthenticated,
-        HasAccessToken = !string.IsNullOrWhiteSpace(accessToken),
-        ExpiresAt = expiresAt
+        HasAccessToken = false,
+        ExpiresAt = (DateTimeOffset?)null
     });
 });
 
@@ -304,37 +283,6 @@ app.MapPut("/profiles", async (MusicProfilesConfig profiles, IProfileService pro
     return Results.NoContent();
 });
 
-app.MapGet("/spotify/authorize", (IServiceProvider services) =>
-{
-    var oauthService = services.GetService<SpotifyOAuthService>();
-    if (oauthService is null)
-    {
-        return Results.BadRequest("Spotify OAuth is unavailable in mock mode.");
-    }
-
-    var state = SpotifyOAuthService.CreateState();
-    var url = oauthService.GetAuthorizationUrl(state);
-    return Results.Ok(new { url, state });
-});
-
-app.MapGet("/callback", async (
-    string? code,
-    string? state,
-    IServiceProvider services,
-    CancellationToken cancellationToken) =>
-{
-    return await HandleSpotifyCallbackAsync(code, state, services, cancellationToken);
-});
-
-app.MapGet("/spotify/callback", async (
-    string? code,
-    string? state,
-    IServiceProvider services,
-    CancellationToken cancellationToken) =>
-{
-    return await HandleSpotifyCallbackAsync(code, state, services, cancellationToken);
-});
-
 // Debug-only surface for the shadow facade; intentionally mapped in both runtime modes.
 app.MapGet("/diagnostics/music-shadow", (IShadowMusicSnapshotSink sink) =>
 {
@@ -376,25 +324,6 @@ void BuildMusicPlayer(WebApplicationBuilder webApplicationBuilder)
     webApplicationBuilder.Services.AddSingleton<IMusicPlayer, TauonMusicPlayer>();
 }
 
-void BuildSpotify(WebApplicationBuilder webApplicationBuilder)
-{
-    var useMock = webApplicationBuilder.Configuration.GetValue<bool>("UseMockSpotify");
-
-    if (useMock)
-    {
-        webApplicationBuilder.Services.AddSingleton<ISpotifyClient, MockSpotifyClient>();
-        return;
-    }
-
-    // Spotify services
-    webApplicationBuilder.Services.AddHttpClient("SpotifyApi");
-    webApplicationBuilder.Services.AddHttpClient("SpotifyOAuth");
-    webApplicationBuilder.Services.AddSingleton<ITokenStorage, InMemoryTokenStorage>();
-    webApplicationBuilder.Services.AddSingleton<SpotifyOAuthService>();
-    webApplicationBuilder.Services.AddSingleton<ISpotifyClient, SpotifyClient>();
-
-}
-
 static async Task EnsureCs2SetupAsync(WebApplication app)
 {
     try
@@ -421,36 +350,6 @@ static async Task EnsureCs2SetupAsync(WebApplication app)
     }
 }
 
-static string? LogSpotifyAuthorizationUrl(WebApplication app)
-{
-    var oauthService = app.Services.GetService<SpotifyOAuthService>();
-    if (oauthService is null)
-    {
-        return null;
-    }
-
-    if (!oauthService.HasClientCredentials)
-    {
-        // UND-47: PKCE flow needs only the public client_id. CLIENT_SECRET is no longer
-        // read or required.
-        app.Logger.LogWarning("Spotify CLIENT_ID not configured. Provide it in the console once, or set the CLIENT_ID environment variable.");
-        return null;
-    }
-
-    // CSRF state is mandatory even for the console flow: the callback rejects
-    // state-less requests, so a drive-by GET /callback cannot consume the pending
-    // PKCE verifier or complete a login it did not start.
-    var authorizationUrl = oauthService.GetAuthorizationUrl(SpotifyOAuthService.CreateState());
-    // The authorization URL embeds the public client_id and a per-attempt PKCE
-    // code_challenge. We surface it on the console so a tester can copy/paste, but
-    // we deliberately do NOT pass it through the structured logger — that keeps
-    // client_id out of any captured log file (UND-47 compliance §"Logs scrub
-    // credentials").
-    Console.WriteLine($"Spotify authorization URL: {authorizationUrl}");
-    app.Logger.LogInformation("Spotify authorization URL ready (printed to console).");
-    return authorizationUrl;
-}
-
 static async Task WarmSmartTrackStartAsync(WebApplication app)
 {
     try
@@ -466,8 +365,7 @@ static async Task WarmSmartTrackStartAsync(WebApplication app)
 
 static async Task WriteConsoleStartupChecklistAsync(
     WebApplication app,
-    ConsoleLaunchSettings consoleLaunchSettings,
-    string? authorizationUrl)
+    ConsoleLaunchSettings consoleLaunchSettings)
 {
     var setupService = app.Services.GetRequiredService<ICs2SetupService>();
     var controlProfileService = app.Services.GetRequiredService<IControlProfileService>();
@@ -528,19 +426,6 @@ static async Task WriteConsoleStartupChecklistAsync(
     Console.WriteLine($"- Music provider: {app.Configuration["Music:Provider"] ?? "Tauon"}");
     Console.WriteLine($"- Quick launch mode: {(consoleLaunchSettings.IsQuickLaunch ? "yes" : "no")}");
     Console.WriteLine($"- MVP launch (--mvp): {(consoleLaunchSettings.IsMvpLaunch ? "yes — intent_capture (observe only; music.control_profile is not executed)" : "no")}");
-    Console.WriteLine($"- Spotify mode: {(consoleLaunchSettings.ConfigurationOverrides.TryGetValue("UseMockSpotify", out var useMock) && string.Equals(useMock, "true", StringComparison.OrdinalIgnoreCase) ? "mock" : "real")}");
-    Console.WriteLine($"- Spotify CLIENT_ID: {(consoleLaunchSettings.HasSpotifyCredentials ? "ready" : "missing")} (PKCE flow — no client_secret used)");
-    Console.WriteLine($"- Prompted for client id this run: {(consoleLaunchSettings.PromptedForCredentials ? "yes" : "no")}");
-    Console.WriteLine($"- Encrypted Spotify secret store: {consoleLaunchSettings.EncryptedStorePath}");
-    Console.WriteLine($"- Loaded client id from encrypted store: {(consoleLaunchSettings.LoadedFromEncryptedStore ? "yes" : "no")}");
-    Console.WriteLine($"- Saved client id to encrypted store this run: {(consoleLaunchSettings.SavedToEncryptedStore ? "yes" : "no")}");
-    Console.WriteLine($"- Cleared encrypted store this run: {(consoleLaunchSettings.ClearedEncryptedStore ? "yes" : "no")}");
-    if (consoleLaunchSettings.LegacyClientSecretEnvVarPresent)
-    {
-        Console.WriteLine("- CLIENT_SECRET environment variable detected: ignored (PKCE flow does not use a client secret).");
-    }
-    Console.WriteLine($"- Spotify redirect URI to register: {consoleLaunchSettings.RedirectUri}");
-    Console.WriteLine($"- Spotify authorization URL: {authorizationUrl ?? "unavailable until credentials are provided"}");
     Console.WriteLine($"- CS2 setup: {(consoleLaunchSettings.SkipCs2Setup ? "skipped" : "attempted")}");
     Console.WriteLine($"- CS2 GSI target URL: {cs2Status?.GsiUri ?? $"{consoleLaunchSettings.GsiBaseUrl}/gsi"}");
     Console.WriteLine($"- CS2 cfg ready: {(consoleLaunchSettings.SkipCs2Setup ? "skipped" : (cs2Status?.IsReady == true ? "yes" : "no"))}{(consoleLaunchSettings.SkipCs2Setup ? string.Empty : FormatSuffix(cs2Status?.CfgPath))}");
@@ -565,8 +450,6 @@ static async Task WriteConsoleStartupChecklistAsync(
     Console.WriteLine($"- Smart Track Start file: {smartTrackStartService.FilePath}");
     Console.WriteLine($"- Spotify authenticated: {(spotifyAuthenticated ? "yes" : "no")}");
     Console.WriteLine("- Spotify playback control requires Premium and an active playback device.");
-    Console.WriteLine("- Use --reset-spotify-secrets to overwrite the saved client id without printing it.");
-    Console.WriteLine("- Use --clear-spotify-secrets to wipe the encrypted store. With PKCE there is no client_secret to clear; this only removes the cached client id.");
     Console.WriteLine("- Edit control-profiles.json for pause/resume/duck behavior.");
     Console.WriteLine("- Edit smart-track-starts.json to configure optional non-zero track starts for spotify.profile playback.");
     Console.WriteLine("- Open /status for GSI + IMusicPlayer state. /spotify/status is leftover until PIVOT-10.");
@@ -577,48 +460,4 @@ static async Task WriteConsoleStartupChecklistAsync(
 static string FormatSuffix(string? value)
 {
     return string.IsNullOrWhiteSpace(value) ? string.Empty : $" ({value})";
-}
-
-static async Task<IResult> HandleSpotifyCallbackAsync(
-    string? code,
-    string? state,
-    IServiceProvider services,
-    CancellationToken cancellationToken)
-{
-    if (string.IsNullOrWhiteSpace(code))
-    {
-        return Results.BadRequest("Missing authorization code.");
-    }
-
-    if (string.IsNullOrWhiteSpace(state))
-    {
-        // CSRF binding: every authorize URL we issue carries a state, so a
-        // state-less callback was not initiated by this host. Reject it before
-        // it can consume a pending PKCE verifier or trigger a token exchange.
-        return Results.BadRequest("Missing state parameter.");
-    }
-
-    var oauthService = services.GetService<SpotifyOAuthService>();
-    var tokenStorage = services.GetService<ITokenStorage>();
-    if (oauthService is null || tokenStorage is null)
-    {
-        return Results.BadRequest("Spotify OAuth is unavailable in mock mode.");
-    }
-
-    try
-    {
-        var result = await oauthService.ExchangeCodeForTokenAsync(code, state, cancellationToken);
-        await tokenStorage.SaveTokensAsync(result.AccessToken, result.RefreshToken, result.ExpiresAt, cancellationToken);
-        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("SpotifyOAuth");
-        logger.LogInformation("Spotify connected. Access token stored in memory until the process exits.");
-        return Results.Content(
-            "<html><body><p>Spotify connected, you can close this window.</p></body></html>",
-            "text/html");
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("SpotifyOAuth");
-        logger.LogError(ex, "Failed to complete Spotify callback");
-        return Results.Problem("Failed to complete Spotify OAuth callback.");
-    }
 }

@@ -61,7 +61,7 @@ Full runbook: **[docs/](docs/README.md)** · Tauon (target): **[docs/tauon-integ
 
 ## Status & limits
 
-- Windows-first (console bootstrap still uses the encrypted Windows store when Spotify OAuth is used)
+- Windows-first (CS2 cfg install paths and the console launch flow target Windows)
 - No desktop UI in this repo — console checklist + local HTTP API
 - Tauon remote API (target) has no auth; use loopback; do not expose port 7814
 - Safety-first music architecture is documented; runtime integration is still shadow-only
