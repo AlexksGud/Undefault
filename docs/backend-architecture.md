@@ -161,7 +161,7 @@ Default file content:
 - `round_start -> duck 0`
 - `death -> restore_volume`
 
-`SpotifyControlProfileAction` applies those commands through `ISpotifyPlaybackControl` (`SpotifyPlaybackControlCoordinator`) so duck, restore, pause, and resume stay consistent across events. The coordinator reads **`SpotifyVolumeDuckOptions`**: a `duck` rule without `VolumePercent` uses `MuteVolume` as the target, and `restore_volume` falls back to `FallbackRestoreVolume` when no pre-duck volume was saved.
+`SpotifyControlProfileAction` applies those commands through `ISpotifyPlaybackControl` (`SpotifyPlaybackControlCoordinator`) so duck, restore, pause, and resume stay consistent across events. The coordinator reads **`VolumeDuckOptions`** (bound from the unchanged `SpotifyVolumeDuck` configuration section): a `duck` rule without `VolumePercent` uses `MuteVolume` as the target, and `restore_volume` falls back to `FallbackRestoreVolume` when no pre-duck volume was saved.
 
 ### Legacy Track Profiles
 

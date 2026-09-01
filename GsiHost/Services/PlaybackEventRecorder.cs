@@ -1,4 +1,4 @@
-using Core.Spotify;
+using Core.Music;
 using GsiHost.Configuration;
 using GsiHost.Tooling.Timeline;
 using Microsoft.Extensions.DependencyInjection;

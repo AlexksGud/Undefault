@@ -1,7 +1,5 @@
-using Core.Actions.Spotify;
 using Core.Configuration;
 using Core.Models;
-using Core.Spotify;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,7 +11,7 @@ namespace Core.Music;
 public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
 {
     private readonly IMusicPlayer _player;
-    private readonly SpotifyVolumeDuckOptions _duckOptions;
+    private readonly VolumeDuckOptions _duckOptions;
     // Retained for DI/constructor compatibility; UND-77 moved pause/resume recording to
     // PlaybackStateObserver, so the coordinator no longer reads this argument.
     private readonly ILogger _logger;
@@ -29,7 +27,7 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
     /// <param name="logger">The logger used for fail-soft diagnostics.</param>
     public MusicPlaybackControlCoordinator(
         IMusicPlayer player,
-        IOptions<SpotifyVolumeDuckOptions>? duckOptions,
+        IOptions<VolumeDuckOptions>? duckOptions,
         ILogger<MusicPlaybackControlCoordinator> logger)
         : this(player, duckOptions, recorder: null, logger)
     {
@@ -44,12 +42,12 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
     /// <param name="logger">The logger used for fail-soft diagnostics.</param>
     public MusicPlaybackControlCoordinator(
         IMusicPlayer player,
-        IOptions<SpotifyVolumeDuckOptions>? duckOptions,
+        IOptions<VolumeDuckOptions>? duckOptions,
         IPlaybackEventRecorder? recorder,
         ILogger logger)
     {
         _player = player;
-        _duckOptions = duckOptions?.Value ?? new SpotifyVolumeDuckOptions();
+        _duckOptions = duckOptions?.Value ?? new VolumeDuckOptions();
         _ = recorder ?? NullPlaybackEventRecorder.Instance;
         _logger = logger;
     }

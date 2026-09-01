@@ -1,4 +1,5 @@
 using Core.Models;
+using Core.Music;
 using Core.Spotify;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -8,7 +9,7 @@ namespace Core.Actions.Spotify;
 public sealed class SpotifyVolumeDuckAction : IEventAction
 {
     private readonly ISpotifyClient _spotifyClient;
-    private readonly SpotifyVolumeDuckOptions _options;
+    private readonly VolumeDuckOptions _options;
     private readonly ILogger<SpotifyVolumeDuckAction> _logger;
     private readonly object _sync = new();
     private int? _savedVolume;
@@ -16,11 +17,11 @@ public sealed class SpotifyVolumeDuckAction : IEventAction
 
     public SpotifyVolumeDuckAction(
         ISpotifyClient spotifyClient,
-        IOptions<SpotifyVolumeDuckOptions>? options,
+        IOptions<VolumeDuckOptions>? options,
         ILogger<SpotifyVolumeDuckAction> logger)
     {
         _spotifyClient = spotifyClient;
-        _options = options?.Value ?? new SpotifyVolumeDuckOptions();
+        _options = options?.Value ?? new VolumeDuckOptions();
         _logger = logger;
     }
 

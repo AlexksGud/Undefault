@@ -92,7 +92,7 @@ builder.Services.Configure<EventDetectorOptions>(
     builder.Configuration.GetSection("EventDetector"));
 builder.Services.Configure<SpotifyClientOptions>(
     builder.Configuration.GetSection("Spotify"));
-builder.Services.Configure<SpotifyVolumeDuckOptions>(
+builder.Services.Configure<VolumeDuckOptions>(
     builder.Configuration.GetSection("SpotifyVolumeDuck"));
 builder.Services.Configure<SmartTrackStartOptions>(
     builder.Configuration.GetSection("SmartTrackStart"));

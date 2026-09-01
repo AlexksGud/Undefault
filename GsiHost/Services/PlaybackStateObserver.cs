@@ -1,3 +1,4 @@
+using Core.Music;
 using Core.Spotify;
 using Core.Spotify.Models;
 using GsiHost.Configuration;

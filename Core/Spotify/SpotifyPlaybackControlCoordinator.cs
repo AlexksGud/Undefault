@@ -1,4 +1,3 @@
-using Core.Actions.Spotify;
 using Core.Music;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,7 +18,7 @@ public sealed class SpotifyPlaybackControlCoordinator : MusicPlaybackControlCoor
     /// <param name="logger">The logger used for fail-soft diagnostics.</param>
     public SpotifyPlaybackControlCoordinator(
         IMusicPlayer player,
-        IOptions<SpotifyVolumeDuckOptions>? duckOptions,
+        IOptions<VolumeDuckOptions>? duckOptions,
         ILogger<SpotifyPlaybackControlCoordinator> logger)
         : base(player, duckOptions, recorder: null, logger)
     {
@@ -34,7 +33,7 @@ public sealed class SpotifyPlaybackControlCoordinator : MusicPlaybackControlCoor
     /// <param name="logger">The logger used for fail-soft diagnostics.</param>
     public SpotifyPlaybackControlCoordinator(
         IMusicPlayer player,
-        IOptions<SpotifyVolumeDuckOptions>? duckOptions,
+        IOptions<VolumeDuckOptions>? duckOptions,
         IPlaybackEventRecorder? recorder,
         ILogger<SpotifyPlaybackControlCoordinator> logger)
         : base(player, duckOptions, recorder, logger)

@@ -1,14 +1,14 @@
-namespace Core.Spotify;
+namespace Core.Music;
 
 /// <summary>
-/// Records confirmed Spotify playback state transitions (pause / resume) as an observe-only side effect.
+/// Records confirmed player playback state transitions (pause / resume) as an observe-only side effect.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Recording is invoked by <c>GsiHost.Services.PlaybackStateObserver</c> after it detects a confirmed
-/// <c>is_playing</c> transition (pause or resume) while polling Spotify playback state. Implementations
-/// must remain strictly observe-only: no Spotify API calls, no routing through
-/// <c>RulesEngine.ActionMap</c>, and no dependency on host types.
+/// playing/paused transition while polling player playback state. Implementations must remain strictly
+/// observe-only: no player API calls, no routing through <c>RulesEngine.ActionMap</c>, and no dependency
+/// on host types.
 /// </para>
 /// <para>
 /// The observer skips recording for no-op states (no usable prior baseline), authentication or device

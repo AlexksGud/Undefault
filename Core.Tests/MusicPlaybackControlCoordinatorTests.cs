@@ -1,4 +1,3 @@
-using Core.Actions.Spotify;
 using Core.Models;
 using Core.Music;
 using FluentAssertions;
@@ -168,7 +167,7 @@ public class MusicPlaybackControlCoordinatorTests
 
         var coordinator = new MusicPlaybackControlCoordinator(
             player,
-            Options.Create(new SpotifyVolumeDuckOptions()),
+            Options.Create(new VolumeDuckOptions()),
             NullLogger<MusicPlaybackControlCoordinator>.Instance);
 
         var act = async () => await coordinator.TryPauseAsync("custom:music_pause");
@@ -179,7 +178,7 @@ public class MusicPlaybackControlCoordinatorTests
     {
         return new MusicPlaybackControlCoordinator(
             player,
-            Options.Create(new SpotifyVolumeDuckOptions
+            Options.Create(new VolumeDuckOptions
             {
                 MuteVolume = 0,
                 FallbackRestoreVolume = 50

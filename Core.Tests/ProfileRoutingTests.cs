@@ -211,7 +211,7 @@ public class ProfileRoutingTests
             }));
         var playback = new MusicPlaybackControlCoordinator(
             player,
-            Options.Create(new SpotifyVolumeDuckOptions()),
+            Options.Create(new VolumeDuckOptions()),
             NullLogger<MusicPlaybackControlCoordinator>.Instance);
         var action = new MusicControlProfileAction(
             playback,
@@ -244,7 +244,7 @@ public class ProfileRoutingTests
             }));
         var playback = new MusicPlaybackControlCoordinator(
             player,
-            Options.Create(new SpotifyVolumeDuckOptions()),
+            Options.Create(new VolumeDuckOptions()),
             NullLogger<MusicPlaybackControlCoordinator>.Instance);
         var action = new MusicControlProfileAction(
             playback,
@@ -283,7 +283,7 @@ public class ProfileRoutingTests
             }));
         var playback = new MusicPlaybackControlCoordinator(
             player,
-            Options.Create(new SpotifyVolumeDuckOptions
+            Options.Create(new VolumeDuckOptions
             {
                 MuteVolume = 0,
                 FallbackRestoreVolume = 50
@@ -321,7 +321,7 @@ public class ProfileRoutingTests
             }));
         var playback = new MusicPlaybackControlCoordinator(
             player,
-            Options.Create(new SpotifyVolumeDuckOptions()),
+            Options.Create(new VolumeDuckOptions()),
             NullLogger<MusicPlaybackControlCoordinator>.Instance);
         var action = new SpotifyControlProfileAction(
             playback,
@@ -356,7 +356,7 @@ public class ProfileRoutingTests
             }));
         var playback = new MusicPlaybackControlCoordinator(
             player,
-            Options.Create(new SpotifyVolumeDuckOptions()),
+            Options.Create(new VolumeDuckOptions()),
             NullLogger<MusicPlaybackControlCoordinator>.Instance);
         var action = new MusicControlProfileAction(
             playback,
@@ -403,7 +403,7 @@ public class ProfileRoutingTests
             }));
         var playback = new MusicPlaybackControlCoordinator(
             player,
-            Options.Create(new SpotifyVolumeDuckOptions()),
+            Options.Create(new VolumeDuckOptions()),
             NullLogger<MusicPlaybackControlCoordinator>.Instance);
         var action = new MusicControlProfileAction(
             playback,
@@ -436,7 +436,7 @@ public class ProfileRoutingTests
         };
         var action = new SpotifyVolumeDuckAction(
             spotifyClient,
-            Options.Create(new SpotifyVolumeDuckOptions
+            Options.Create(new VolumeDuckOptions
             {
                 MuteVolume = 0,
                 FallbackRestoreVolume = 50
