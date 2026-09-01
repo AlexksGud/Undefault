@@ -17,7 +17,9 @@ internal sealed class FakeSmtcSessionSource : ISmtcSessionSource
 
     public bool PreviousResult { get; set; } = true;
 
-    public int ForceUpdateCalls { get; private set; }
+    private int _forceUpdateCalls;
+
+    public int ForceUpdateCalls => Volatile.Read(ref _forceUpdateCalls);
 
     public Exception? GetSessionsException { get; set; }
 
@@ -45,7 +47,7 @@ internal sealed class FakeSmtcSessionSource : ISmtcSessionSource
         => CompleteCommand("previous", sourceAppUserModelId, PreviousResult, cancellationToken);
 
     public void ForceUpdate()
-        => ForceUpdateCalls++;
+        => Interlocked.Increment(ref _forceUpdateCalls);
 
     private Task<bool?> CompleteCommand(
         string action,

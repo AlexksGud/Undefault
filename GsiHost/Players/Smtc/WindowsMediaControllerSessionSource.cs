@@ -8,6 +8,10 @@ namespace GsiHost.Players.Smtc;
 /// <summary>
 /// Dubya <see cref="MediaManager"/> implementation of <see cref="ISmtcSessionSource"/>.
 /// </summary>
+/// <remarks>
+/// Does not subscribe to Dubya <c>SessionsChanged</c>. Reattachment is
+/// <see cref="ForceUpdate"/> from <c>SmtcMusicPlayer</c> while the selected id is absent.
+/// </remarks>
 internal sealed class WindowsMediaControllerSessionSource : ISmtcSessionSource, IDisposable
 {
     private readonly MediaManager _mediaManager;
