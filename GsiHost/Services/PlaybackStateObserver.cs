@@ -1,30 +1,28 @@
 using Core.Music;
-using Core.Spotify;
-using Core.Spotify.Models;
 using GsiHost.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace GsiHost.Services;
 
 /// <summary>
-/// Background service that polls Spotify current playback at a configurable interval and records
-/// confirmed <c>is_playing</c> transitions (<c>playback_paused</c> / <c>playback_resumed</c>) to the
+/// Background service that polls <see cref="IMusicPlayer"/> at a configurable interval and records
+/// confirmed playing/not-playing transitions (<c>playback_paused</c> / <c>playback_resumed</c>) to the
 /// timeline through <see cref="IPlaybackEventRecorder"/>.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The MVP observes Spotify playback state instead of binding a custom global hotkey: physical media
-/// play/pause keys cannot be registered with <c>RegisterHotKey</c>, and Spotify controls that playback
-/// natively. This observer is the single source of truth for pause/resume timeline entries; the
-/// playback control coordinator no longer records transitions (UND-77).
+/// This observer is leftover <c>intent_capture</c> tester tooling. It is the single source of truth
+/// for pause/resume timeline entries; the playback control coordinator no longer records transitions
+/// (UND-77).
 /// </para>
 /// <para>
 /// The poll loop gates every cycle on <see cref="IsEnabled"/> (<see cref="PlaybackObserverOptions.Enabled"/>
 /// AND <c>intent_capture</c> runtime). When not enabled the loop delays and continues without polling or
-/// recording. Polling is skipped cleanly (no record, no crash) when Spotify is not authenticated, there
-/// is no active device (<see cref="GetCurrentPlaybackAsync"/> returns <see langword="null"/>), there is
-/// no current track, or the playback call throws. Repeated poll errors are logged once at Warning and
-/// then at Debug to avoid log spam.
+/// recording. Polling is skipped cleanly (no record, no crash) when the player is unavailable
+/// (<see cref="IMusicPlayer.IsAvailableAsync"/> is false), state cannot be read
+/// (<see cref="IMusicPlayer.GetStateAsync"/> returns <see langword="null"/>), there is no current track,
+/// or the state call throws. Repeated poll errors are logged once at Warning and then at Debug to avoid
+/// log spam.
 /// </para>
 /// <para>
 /// Transition detection keeps a nullable <c>_lastIsPlaying</c> baseline. The first usable observation
@@ -33,7 +31,7 @@ namespace GsiHost.Services;
 /// </remarks>
 public sealed class PlaybackStateObserver : BackgroundService
 {
-    private readonly ISpotifyClient _spotifyClient;
+    private readonly IMusicPlayer _musicPlayer;
     private readonly IPlaybackEventRecorder _recorder;
     private readonly PlaybackObserverOptions _options;
     private readonly RuntimeOptions _runtime;
@@ -42,13 +40,13 @@ public sealed class PlaybackStateObserver : BackgroundService
     private int _consecutivePollErrors;
 
     public PlaybackStateObserver(
-        ISpotifyClient spotifyClient,
+        IMusicPlayer musicPlayer,
         IPlaybackEventRecorder recorder,
         IOptions<PlaybackObserverOptions> options,
         IOptions<RuntimeOptions> runtime,
         ILogger<PlaybackStateObserver> logger)
     {
-        _spotifyClient = spotifyClient;
+        _musicPlayer = musicPlayer;
         _recorder = recorder;
         _options = options.Value;
         _runtime = runtime.Value;
@@ -93,7 +91,7 @@ public sealed class PlaybackStateObserver : BackgroundService
             }
             catch (Exception ex)
             {
-                // PollAsync swallows expected Spotify failures; this guard keeps the host loop
+                // PollAsync swallows expected player failures; this guard keeps the host loop
                 // alive if an unexpected exception escapes a poll cycle.
                 LogPollError(ex);
             }
@@ -101,7 +99,7 @@ public sealed class PlaybackStateObserver : BackgroundService
     }
 
     /// <summary>
-    /// Executes a single poll cycle: reads Spotify playback state and records an <c>is_playing</c>
+    /// Executes a single poll cycle: reads player playback state and records a playing/not-playing
     /// transition through <see cref="IPlaybackEventRecorder"/> when one is detected.
     /// </summary>
     /// <remarks>
@@ -117,15 +115,15 @@ public sealed class PlaybackStateObserver : BackgroundService
             return;
         }
 
-        if (!await _spotifyClient.IsAuthenticatedAsync(cancellationToken).ConfigureAwait(false))
+        if (!await _musicPlayer.IsAvailableAsync(cancellationToken).ConfigureAwait(false))
         {
             return;
         }
 
-        PlaybackState? playback;
+        MusicPlaybackState? playback;
         try
         {
-            playback = await _spotifyClient.GetCurrentPlaybackAsync(cancellationToken).ConfigureAwait(false);
+            playback = await _musicPlayer.GetStateAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -140,16 +138,17 @@ public sealed class PlaybackStateObserver : BackgroundService
 
         if (playback is null || playback.Track is null)
         {
-            // No active device or no current track: nothing to observe, keep the last known state.
+            // No readable state or no current track: nothing to observe, keep the last known state.
             return;
         }
 
         Interlocked.Exchange(ref _consecutivePollErrors, 0);
-        await EvaluateTransitionAsync(playback.IsPlaying, cancellationToken).ConfigureAwait(false);
+        await EvaluateTransitionAsync(playback.Status == PlaybackStatus.Playing, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Clears the last-known <c>is_playing</c> baseline so the next usable poll re-establishes state
+    /// Clears the last-known playing baseline so the next usable poll re-establishes state
     /// without emitting a spurious transition. Called from <see cref="GsiResetService"/> on
     /// <c>POST /gsi/reset</c> (session boundary).
     /// </summary>

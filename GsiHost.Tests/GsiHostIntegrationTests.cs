@@ -5,8 +5,6 @@ using System.Text.Json;
 using Core.Configuration;
 using Core.Music;
 using Core.Services;
-using Core.Spotify;
-using Core.Spotify.Models;
 using Cs2Simulator.Runtime;
 using Cs2Simulator.Scenarios.Scenarios;
 using FluentAssertions;
@@ -38,7 +36,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task GsiEndpoint_AcceptsPayload_AndCreatesEvents()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
 
         var response1 = await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1000, 100));
         response1.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -65,7 +63,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task StatusAndEventsEndpoints_ReturnData()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
 
         var status = await host.Client.GetAsync("/status");
         status.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -77,16 +75,16 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task GsiEndpoint_AllowsEmptyPayload()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
 
         var response = await host.Client.PostAsJsonAsync("/gsi", new { });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
-    public async Task StatusEndpoint_HandlesSpotifyFailure()
+    public async Task StatusEndpoint_HandlesMusicPlayerFailure()
     {
-        using var host = CreateTestHost(new ThrowingSpotifyClient());
+        using var host = CreateTestHost(new ThrowingMusicPlayer());
 
         var response = await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1000, 100));
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -99,7 +97,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public void MusicProviderTauon_WithoutReplace_RegistersTauonMusicPlayer()
     {
         using var host = CreateTestHost(
-            new FakeSpotifyClient(),
             replaceMusicPlayer: false,
             appSettingsJson: BuildAppSettingsJson("http://127.0.0.1:5292", musicProvider: "Tauon"));
 
@@ -110,7 +107,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public void MusicProviderMock_WithoutReplace_RegistersMockMusicPlayer()
     {
         using var host = CreateTestHost(
-            new FakeSpotifyClient(),
             replaceMusicPlayer: false,
             appSettingsJson: BuildAppSettingsJson("http://127.0.0.1:5292", musicProvider: "Mock"));
 
@@ -121,7 +117,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task StatusEndpoint_ReportsMusicPlayerFieldsFromInjectedPlayer()
     {
         var player = CreatePausedMockPlayer();
-        using var host = CreateTestHost(new FakeSpotifyClient(), player);
+        using var host = CreateTestHost(player);
 
         var response = await host.Client.GetAsync("/status");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -131,12 +127,13 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
         root.GetProperty("musicProvider").GetString().Should().Be("Mock");
         root.GetProperty("musicPlayerAvailable").GetBoolean().Should().BeTrue();
         root.GetProperty("playbackState").GetString().Should().Be("Paused");
+        root.TryGetProperty("leftoverSpotifyStatus", out _).Should().BeFalse();
     }
 
     [Fact]
     public async Task ProfilesEndpoint_RoundTripsNewSchema()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
 
         var payload = new MusicProfilesConfig(
             "default",
@@ -166,7 +163,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task ControlProfilesEndpoint_RoundTripsConsoleControlSchema()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
 
         var payload = new ConsoleControlProfilesConfig(
             "console-default",
@@ -196,127 +193,10 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     }
 
     [Fact]
-    public async Task SpotifyProfilePlayback_UsesSmartTrackStartOffset_WhenEnabled()
-    {
-        var spotifyClient = new FakeSpotifyClient
-        {
-            Authenticated = true
-        };
-        using var host = CreateTestHost(
-            spotifyClient,
-            appSettingsJson: BuildAppSettingsJson(
-                "http://127.0.0.1:5292",
-                enableSmartTrackStart: true,
-                roundStartAction: "spotify.profile",
-                deathAction: "spotify.control_profile"),
-            seedContentRoot: tempRoot =>
-            {
-                File.WriteAllText(
-                    Path.Combine(tempRoot, "profiles.json"),
-                    """
-                    {
-                      "ActiveProfileId": "default",
-                      "Profiles": [
-                        {
-                          "Id": "default",
-                          "Name": "Default",
-                          "Rules": [
-                            {
-                              "EventKey": "round_start",
-                              "Tracks": [ "spotify:track:anthem" ]
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                    """);
-
-                File.WriteAllText(
-                    Path.Combine(tempRoot, "smart-track-starts.json"),
-                    """
-                    {
-                      "Entries": [
-                        {
-                          "TrackUri": "spotify:track:anthem",
-                          "StartPositionMs": 42000,
-                          "CueLabel": "drop"
-                        }
-                      ]
-                    }
-                    """);
-            });
-
-        await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1000, 100, round: 4, phase: "freezetime"));
-        var response = await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1001, 100, round: 4, phase: "live"));
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        spotifyClient.PlayedUris.Should().ContainSingle().Which.Should().Be("spotify:track:anthem");
-        spotifyClient.PlayedPositions.Should().ContainSingle().Which.Should().Be(42_000);
-    }
-
-    [Fact]
-    public async Task SpotifyProfilePlayback_IgnoresSmartTrackStartMetadata_WhenDisabled()
-    {
-        var spotifyClient = new FakeSpotifyClient
-        {
-            Authenticated = true
-        };
-        using var host = CreateTestHost(
-            spotifyClient,
-            appSettingsJson: BuildAppSettingsJson(
-                "http://127.0.0.1:5292",
-                enableSmartTrackStart: false,
-                roundStartAction: "spotify.profile",
-                deathAction: "spotify.control_profile"),
-            seedContentRoot: tempRoot =>
-            {
-                File.WriteAllText(
-                    Path.Combine(tempRoot, "profiles.json"),
-                    """
-                    {
-                      "ActiveProfileId": "default",
-                      "Profiles": [
-                        {
-                          "Id": "default",
-                          "Name": "Default",
-                          "Rules": [
-                            {
-                              "EventKey": "round_start",
-                              "Tracks": [ "spotify:track:anthem" ]
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                    """);
-
-                File.WriteAllText(
-                    Path.Combine(tempRoot, "smart-track-starts.json"),
-                    """
-                    {
-                      "Entries": [
-                        {
-                          "TrackUri": "spotify:track:anthem",
-                          "StartPositionMs": 42000
-                        }
-                      ]
-                    }
-                    """);
-            });
-
-        await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1000, 100, round: 4, phase: "freezetime"));
-        var response = await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1001, 100, round: 4, phase: "live"));
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        spotifyClient.PlayedUris.Should().ContainSingle().Which.Should().Be("spotify:track:anthem");
-        spotifyClient.PlayedPositions.Should().ContainSingle().Which.Should().BeNull();
-    }
-
-    [Fact]
     public async Task Cs2SetupStatus_ReflectsAutoInstalledConfigUsingConfiguredUri()
     {
         const string gsiBaseUrl = "http://127.0.0.1:6875";
-        using var host = CreateTestHost(new FakeSpotifyClient(), gsiBaseUrl: gsiBaseUrl);
+        using var host = CreateTestHost(gsiBaseUrl: gsiBaseUrl);
 
         var status = await host.Client.GetFromJsonAsync<Cs2SetupStatus>("/setup/cs2/status");
 
@@ -336,7 +216,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task PostGsiReset_ReturnsNoContent_AndClearsState()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
 
         var pre1 = await host.Client.PostAsJsonAsync("/gsi", CreatePayload(2000, 100));
         pre1.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -382,7 +262,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task PostGsiReset_ReturnsForbidden_WhenAllowResetIsFalse()
     {
         using var host = CreateTestHost(
-            new FakeSpotifyClient(),
             appSettingsJson: BuildAppSettingsJson("http://127.0.0.1:5292", allowGsiReset: false));
 
         var response = await host.Client.PostAsync("/gsi/reset", content: null);
@@ -392,7 +271,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task Cs2Simulator_TSideRound_ViaHttpTransport_SurfacesRoundStartOnEvents()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
         EnsureClientBaseAddressHasTrailingSlash(host.Client);
 
         var transport = new HttpGsiTransport(host.Client, NullLogger<HttpGsiTransport>.Instance);
@@ -416,7 +295,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task DefaultControlProfile_ResumesOnRoundStart_AndPausesOnDeath()
     {
         var player = CreatePausedMockPlayer();
-        using var host = CreateTestHost(new FakeSpotifyClient { Authenticated = true }, player);
+        using var host = CreateTestHost(player);
 
         await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1000, 100, round: 4, phase: "freezetime"));
         var roundStartResponse = await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1001, 100, round: 4, phase: "live"));
@@ -432,11 +311,34 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     }
 
     [Fact]
+    public async Task LegacySpotifyControlProfile_ResumesOnRoundStart_AndPausesOnDeath()
+    {
+        var player = CreatePausedMockPlayer();
+        using var host = CreateTestHost(
+            player,
+            appSettingsJson: BuildAppSettingsJson(
+                "http://127.0.0.1:5292",
+                roundStartAction: "spotify.control_profile",
+                deathAction: "spotify.control_profile"));
+
+        await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1000, 100, round: 4, phase: "freezetime"));
+        var roundStartResponse = await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1001, 100, round: 4, phase: "live"));
+        roundStartResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var deathResponse = await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1002, 0, round: 4, phase: "live"));
+        deathResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        player.PlayCalls.Should().Be(1);
+        player.ResumeCalls.Should().Be(0);
+        player.PauseCalls.Should().Be(1);
+    }
+
+    [Fact]
     public async Task GsiEndpoint_WhenMusicPlayerUnavailable_StillReturnsOk()
     {
         var player = CreatePausedMockPlayer();
         player.Available = false;
-        using var host = CreateTestHost(new FakeSpotifyClient { Authenticated = true }, player);
+        using var host = CreateTestHost(player);
 
         await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1000, 100, round: 4, phase: "freezetime"));
         var roundStartResponse = await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1001, 100, round: 4, phase: "live"));
@@ -453,7 +355,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task GsiReset_ClearsTimelineEntries()
     {
         using var host = CreateTestHost(
-            new FakeSpotifyClient { Authenticated = true },
             appSettingsJson: BuildIntentCaptureAppSettingsJson("http://127.0.0.1:5292"));
 
         await host.Client.PostAsJsonAsync("/gsi", CreatePayload(4200, 100, round: 6, phase: "freezetime"));
@@ -477,7 +378,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task GsiEndpoint_RoundStart_UsesSinglePlayerSideEffectPath()
     {
         var player = CreatePausedMockPlayer();
-        using var host = CreateTestHost(new FakeSpotifyClient { Authenticated = true }, player);
+        using var host = CreateTestHost(player);
 
         await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1100, 100, round: 8, phase: "freezetime"));
         var response = await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1101, 100, round: 8, phase: "live"));
@@ -494,7 +395,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task GsiEndpoint_ShadowMode_RoundStartTick_ResumesOnce_AndShadowReportsSafe()
     {
         var player = CreatePausedMockPlayer();
-        using var host = CreateTestHost(new FakeSpotifyClient { Authenticated = true }, player);
+        using var host = CreateTestHost(player);
 
         await host.Client.PostAsJsonAsync("/gsi", CreatePayload(2200, 100, round: 11, phase: "freezetime"));
         var response = await host.Client.PostAsJsonAsync(
@@ -519,7 +420,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task GsiEndpoint_ShadowMode_DeathTick_PausesOnce_AndShadowReportsDanger()
     {
         var player = CreatePausedMockPlayer();
-        using var host = CreateTestHost(new FakeSpotifyClient { Authenticated = true }, player);
+        using var host = CreateTestHost(player);
 
         await host.Client.PostAsJsonAsync("/gsi", CreatePayload(2300, 100, round: 12, phase: "freezetime"));
         await host.Client.PostAsJsonAsync("/gsi", CreatePayload(2301, 100, round: 12, phase: "live"));
@@ -547,7 +448,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     {
         var player = CreatePausedMockPlayer();
         using var host = CreateTestHost(
-            new FakeSpotifyClient { Authenticated = true },
             player,
             appSettingsJson: BuildAppSettingsJson("http://127.0.0.1:5292", musicOrchestrationShadowMode: false));
 
@@ -566,7 +466,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task AdapterDiagnostics_ListsRegisteredCs2AndDotaAdapters()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
 
         var body = await host.Client.GetStringAsync("/diagnostics/adapters");
 
@@ -602,7 +502,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task ScenarioPlayback_TimelineEndpoints_AreNotMapped()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
 
         var timeline = await host.Client.GetAsync("/timeline");
         var episodes = await host.Client.GetAsync("/timeline/episodes");
@@ -615,7 +515,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task IntentCapture_TimelineEndpoint_ReturnsOk()
     {
         using var host = CreateTestHost(
-            new FakeSpotifyClient { Authenticated = true },
             appSettingsJson: BuildIntentCaptureAppSettingsJson("http://127.0.0.1:5292"));
 
         var timeline = await host.Client.GetAsync("/timeline");
@@ -626,7 +525,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public void ScenarioPlayback_DoesNotRegisterPlaybackStateObserverHostedService()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
 
         var hostedServices = host.Factory.Services.GetServices<Microsoft.Extensions.Hosting.IHostedService>();
 
@@ -637,7 +536,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public void IntentCapture_RegistersPlaybackStateObserverHostedService()
     {
         using var host = CreateTestHost(
-            new FakeSpotifyClient(),
             appSettingsJson: BuildIntentCaptureAppSettingsJson("http://127.0.0.1:5292"));
 
         var hostedServices = host.Factory.Services.GetServices<Microsoft.Extensions.Hosting.IHostedService>();
@@ -648,23 +546,18 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task PlaybackObserver_PauseTransition_RecordsPausedInTimelineAndJsonl()
     {
-        var spotifyClient = new FakeSpotifyClient
-        {
-            Authenticated = true,
-            CurrentPlayback = PlayingWithTrack()
-        };
+        var player = CreatePlayingMockPlayer();
         using var host = CreateTestHost(
-            spotifyClient,
+            player,
             appSettingsJson: BuildObserverEnabledIntentCaptureAppSettingsJson("http://127.0.0.1:5292"));
 
         // Wait for the observer to establish a "playing" baseline before introducing the transition,
         // so the next poll detects a real true -> false change (AC #1).
         (await WaitForAsync(
-            () => spotifyClient.GetCurrentPlaybackCalls >= 1,
+            () => player.GetStateCalls >= 1,
             TimeSpan.FromSeconds(8))).Should().BeTrue("observer should poll at least once for a baseline");
 
-        // Simulate the physical media play/pause key: Spotify pauses itself.
-        spotifyClient.CurrentPlayback = spotifyClient.CurrentPlayback with { IsPlaying = false };
+        player.SeedState(PlaybackStatus.Paused);
 
         var paused = await WaitForPlaybackEntryAsync(host.Client, TimelinePlaybackEvents.Paused, TimeSpan.FromSeconds(8));
         paused.Should().NotBeNull();
@@ -678,21 +571,16 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task PlaybackObserver_ResumeTransition_RecordsResumedInTimelineAndJsonl()
     {
-        var spotifyClient = new FakeSpotifyClient
-        {
-            Authenticated = true,
-            CurrentPlayback = PausedWithTrack()
-        };
+        var player = CreatePausedMockPlayer();
         using var host = CreateTestHost(
-            spotifyClient,
+            player,
             appSettingsJson: BuildObserverEnabledIntentCaptureAppSettingsJson("http://127.0.0.1:5292"));
 
         (await WaitForAsync(
-            () => spotifyClient.GetCurrentPlaybackCalls >= 1,
+            () => player.GetStateCalls >= 1,
             TimeSpan.FromSeconds(8))).Should().BeTrue("observer should poll at least once for a baseline");
 
-        // Simulate the physical media play/pause key: Spotify resumes itself.
-        spotifyClient.CurrentPlayback = spotifyClient.CurrentPlayback with { IsPlaying = true };
+        player.SeedState(PlaybackStatus.Playing);
 
         var resumed = await WaitForPlaybackEntryAsync(host.Client, TimelinePlaybackEvents.Resumed, TimeSpan.FromSeconds(8));
         resumed.Should().NotBeNull();
@@ -706,21 +594,17 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task PlaybackObserver_ResetStartsNewJsonlSessionFile()
     {
-        var spotifyClient = new FakeSpotifyClient
-        {
-            Authenticated = true,
-            CurrentPlayback = PlayingWithTrack()
-        };
+        var player = CreatePlayingMockPlayer();
         using var host = CreateTestHost(
-            spotifyClient,
+            player,
             appSettingsJson: BuildObserverEnabledIntentCaptureAppSettingsJson("http://127.0.0.1:5292"));
 
         (await WaitForAsync(
-            () => spotifyClient.GetCurrentPlaybackCalls >= 1,
+            () => player.GetStateCalls >= 1,
             TimeSpan.FromSeconds(8))).Should().BeTrue("observer should poll at least once for a baseline");
 
         // First transition -> playback_paused recorded to the first JSONL session file.
-        spotifyClient.CurrentPlayback = spotifyClient.CurrentPlayback with { IsPlaying = false };
+        player.SeedState(PlaybackStatus.Paused);
         var firstPaused = await WaitForPlaybackEntryAsync(host.Client, TimelinePlaybackEvents.Paused, TimeSpan.FromSeconds(8));
         firstPaused.Should().NotBeNull();
 
@@ -736,16 +620,16 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
         inMemoryAfterReset.Should().BeEmpty("reset clears the in-memory timeline");
 
         // Still paused after reset: first post-reset poll is a fresh baseline (no record).
-        var pollsAtReset = spotifyClient.GetCurrentPlaybackCalls;
+        var pollsAtReset = player.GetStateCalls;
         (await WaitForAsync(
-            () => spotifyClient.GetCurrentPlaybackCalls > pollsAtReset,
+            () => player.GetStateCalls > pollsAtReset,
             TimeSpan.FromSeconds(8))).Should().BeTrue("observer should re-baseline after reset");
 
         (await GetTimelineEntriesAsync(host.Client)).Should().BeEmpty(
             "first usable observation after reset must not emit a transition");
 
         // Now a real transition writes into the new session file.
-        spotifyClient.CurrentPlayback = spotifyClient.CurrentPlayback with { IsPlaying = true };
+        player.SeedState(PlaybackStatus.Playing);
         var resumed = await WaitForPlaybackEntryAsync(host.Client, TimelinePlaybackEvents.Resumed, TimeSpan.FromSeconds(8));
         resumed.Should().NotBeNull();
 
@@ -761,20 +645,16 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task PlaybackObserver_JsonlRoundTripsToTimelineEntry_AndMatchesInMemory()
     {
-        var spotifyClient = new FakeSpotifyClient
-        {
-            Authenticated = true,
-            CurrentPlayback = PlayingWithTrack()
-        };
+        var player = CreatePlayingMockPlayer();
         using var host = CreateTestHost(
-            spotifyClient,
+            player,
             appSettingsJson: BuildObserverEnabledIntentCaptureAppSettingsJson("http://127.0.0.1:5292"));
 
         (await WaitForAsync(
-            () => spotifyClient.GetCurrentPlaybackCalls >= 1,
+            () => player.GetStateCalls >= 1,
             TimeSpan.FromSeconds(8))).Should().BeTrue("observer should poll at least once for a baseline");
 
-        spotifyClient.CurrentPlayback = spotifyClient.CurrentPlayback with { IsPlaying = false };
+        player.SeedState(PlaybackStatus.Paused);
         await WaitForPlaybackEntryAsync(host.Client, TimelinePlaybackEvents.Paused, TimeSpan.FromSeconds(8));
 
         var inMemory = await GetTimelineEntriesAsync(host.Client);
@@ -805,7 +685,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     {
         var player = CreatePlayingMockPlayer();
         using var host = CreateTestHost(
-            new FakeSpotifyClient { Authenticated = true },
             player,
             appSettingsJson: BuildAppSettingsJson(
                 "http://127.0.0.1:5292",
@@ -827,7 +706,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task DotaEndpoint_AcceptsPayload_RegardlessOfRuntimeMode()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
 
         var response = await host.Client.PostAsJsonAsync("/gsi/dota", CreateDotaPayload());
 
@@ -837,7 +716,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     [Fact]
     public async Task DotaEndpoint_AllowsEmptyPayload()
     {
-        using var host = CreateTestHost(new FakeSpotifyClient());
+        using var host = CreateTestHost();
 
         var response = await host.Client.PostAsJsonAsync("/gsi/dota", new { });
 
@@ -848,7 +727,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task DotaEndpoint_WithTimelineEnabled_FirstPayloadEstablishesBaseline_NoTransitionRecorded()
     {
         using var host = CreateTestHost(
-            new FakeSpotifyClient(),
             appSettingsJson: BuildIntentCaptureAppSettingsJson("http://127.0.0.1:5292"));
 
         await host.Client.PostAsJsonAsync(
@@ -869,7 +747,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task DotaEndpoint_WithTimelineEnabled_RecordsGameStateHeroDeathAndPauseTransitions()
     {
         using var host = CreateTestHost(
-            new FakeSpotifyClient(),
             appSettingsJson: BuildIntentCaptureAppSettingsJson("http://127.0.0.1:5292"));
 
         await host.Client.PostAsJsonAsync(
@@ -897,7 +774,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task GsiReset_ClearsDotaBaselines_SoNextPayloadReestablishesWithoutSpuriousDeath()
     {
         using var host = CreateTestHost(
-            new FakeSpotifyClient(),
             appSettingsJson: BuildIntentCaptureAppSettingsJson("http://127.0.0.1:5292"));
 
         await host.Client.PostAsJsonAsync(
@@ -932,7 +808,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task DotaEndpoint_WithTimelineDisabled_DoesNotRecordEntries()
     {
         using var host = CreateTestHost(
-            new FakeSpotifyClient(),
             appSettingsJson: BuildAppSettingsJson(
                 "http://127.0.0.1:5292",
                 runtimeMode: "intent_capture",
@@ -1005,83 +880,36 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
         });
     }
 
-    private sealed class FakeSpotifyClient : ISpotifyClient
+    private sealed class ThrowingMusicPlayer : IMusicPlayer
     {
-        public bool Authenticated { get; set; }
-        public PlaybackState? CurrentPlayback { get; set; }
-        public List<string?> PlayedUris { get; } = new();
-        public List<int?> PlayedPositions { get; } = new();
-        public List<int> VolumeCalls { get; } = new();
-        public int PauseCalls { get; private set; }
-        public int ResumeCalls { get; private set; }
-        public int PlaybackSideEffectCalls => PlayedUris.Count + VolumeCalls.Count + PauseCalls + ResumeCalls;
+        public MusicPlayerCapabilities Capabilities => MusicPlayerCapabilities.Mvp;
 
-        private int _getCurrentPlaybackCalls;
-        public int GetCurrentPlaybackCalls => _getCurrentPlaybackCalls;
+        public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
 
-        public Task<PlaybackState?> GetCurrentPlaybackAsync(CancellationToken cancellationToken = default)
-        {
-            Interlocked.Increment(ref _getCurrentPlaybackCalls);
-            return Task.FromResult(CurrentPlayback);
-        }
+        public Task<MusicPlaybackState?> GetStateAsync(CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("Player unavailable");
 
-        public Task PlayAsync(string? uri = null, CancellationToken cancellationToken = default)
-        {
-            return PlayAsync(uri, positionMs: null, cancellationToken);
-        }
+        public Task<MusicCommandResult> PlayAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
 
-        public Task PlayAsync(string? uri = null, int? positionMs = null, CancellationToken cancellationToken = default)
-        {
-            PlayedUris.Add(uri);
-            PlayedPositions.Add(positionMs);
-            return Task.CompletedTask;
-        }
-        public Task PauseAsync(CancellationToken cancellationToken = default)
-        {
-            PauseCalls++;
-            CurrentPlayback = CurrentPlayback is null
-                ? null
-                : CurrentPlayback with { IsPlaying = false };
-            return Task.CompletedTask;
-        }
+        public Task<MusicCommandResult> PauseAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
 
-        public Task ResumeAsync(CancellationToken cancellationToken = default)
-        {
-            ResumeCalls++;
-            CurrentPlayback = CurrentPlayback is null
-                ? null
-                : CurrentPlayback with { IsPlaying = true };
-            return Task.CompletedTask;
-        }
-        public Task SetVolumeAsync(int volume, CancellationToken cancellationToken = default)
-        {
-            VolumeCalls.Add(volume);
-            CurrentPlayback = CurrentPlayback is null
-                ? null
-                : CurrentPlayback with { VolumePercent = volume };
-            return Task.CompletedTask;
-        }
+        public Task<MusicCommandResult> ResumeAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
 
-        public Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken = default) => Task.FromResult(Authenticated);
-    }
+        public Task<MusicCommandResult> NextAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
 
-    private sealed class ThrowingSpotifyClient : ISpotifyClient
-    {
-        public Task<PlaybackState?> GetCurrentPlaybackAsync(CancellationToken cancellationToken = default)
-            => throw new InvalidOperationException("Spotify unavailable");
+        public Task<MusicCommandResult> PreviousAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
 
-        public Task PlayAsync(string? uri = null, CancellationToken cancellationToken = default)
-            => PlayAsync(uri, positionMs: null, cancellationToken);
-
-        public Task PlayAsync(string? uri = null, int? positionMs = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task PauseAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task ResumeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task SetVolumeAsync(int volume, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+        public Task<MusicCommandResult> SetVolumeAsync(int volumePercent, CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
     }
 
     private TestHostContext CreateTestHost(
-        ISpotifyClient spotifyClient,
         IMusicPlayer? musicPlayer = null,
         string gsiBaseUrl = "http://127.0.0.1:5292",
         string? appSettingsJson = null,
@@ -1103,7 +931,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
             builder.UseSetting(WebHostDefaults.ContentRootKey, tempRoot);
             builder.ConfigureServices(services =>
             {
-                services.AddSingleton<ISpotifyClient>(_ => spotifyClient);
                 if (replaceMusicPlayer)
                 {
                     services.AddSingleton<IMusicPlayer>(sp =>
@@ -1205,25 +1032,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
         player.SeedState(PlaybackStatus.Playing, volumePercent: 70);
         return player;
     }
-
-    private static PlaybackState PlayingWithTrack() => TrackPlaybackState(isPlaying: true);
-
-    private static PlaybackState PausedWithTrack() => TrackPlaybackState(isPlaying: false);
-
-    private static PlaybackState TrackPlaybackState(bool isPlaying) => new(
-        IsPlaying: isPlaying,
-        VolumePercent: 70,
-        Track: SampleTrack(),
-        DeviceId: "device",
-        DeviceName: "Desktop");
-
-    private static Track SampleTrack() => new(
-        Id: "track-1",
-        Name: "Song",
-        Uri: "spotify:track:track-1",
-        DurationMs: 180_000,
-        Artists: new List<Artist> { new("artist-1", "Artist") },
-        Album: null);
 
     private static string[] GetSessionFiles(string tempRoot)
     {
