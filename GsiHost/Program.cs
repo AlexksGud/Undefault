@@ -127,6 +127,7 @@ if (!consoleLaunchSettings.SkipCs2Setup)
 
 await WriteConsoleStartupChecklistAsync(app, consoleLaunchSettings);
 
+app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapMusicOnboarding();
 
