@@ -9,7 +9,9 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0-windows10.0.19041.0;net8.0</TargetFrameworks>
+    <!-- Lets restore succeed on a non-Windows agent; CI itself runs windows-latest. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>

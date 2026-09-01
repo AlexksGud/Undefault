@@ -2,12 +2,12 @@
 
 Start `GsiHost` for local iteration.
 
-> **Current binary:** `--quick` sets `Music:Provider=Mock` (no Tauon, no CS2 auto-setup). Default non-quick provider is Tauon (`http://127.0.0.1:7814`). See [roadmap.md](roadmap.md) and [tauon-integration.md](tauon-integration.md).
+> **Current binary:** `--quick` sets `Music:Provider=Mock` (no Tauon, no CS2 auto-setup). Default non-quick provider is Tauon (`http://127.0.0.1:7814`). `GsiHost` multi-targets; run/publish with `-f net8.0-windows10.0.19041.0`. See [roadmap.md](roadmap.md) and [tauon-integration.md](tauon-integration.md).
 
 ## Fastest start
 
 ```powershell
-dotnet run --project .\GsiHost -- --quick
+dotnet run --project .\GsiHost -f net8.0-windows10.0.19041.0 -- --quick
 ```
 
 `--quick` mode uses `MockMusicPlayer` and skips CS2 auto-setup.
@@ -15,7 +15,7 @@ dotnet run --project .\GsiHost -- --quick
 ## Faster startup
 
 ```powershell
-dotnet run --project .\GsiHost -- --skip-cs2-setup
+dotnet run --project .\GsiHost -f net8.0-windows10.0.19041.0 -- --skip-cs2-setup
 ```
 
 To use the in-process mock without `--quick` (CS2 auto-setup still runs), set `Music:Provider=Mock`. `--use-mock-spotify` and `--skip-smart-track-warmup` are removed; they are not accepted aliases.

@@ -14,14 +14,14 @@ can be exercised without launching CS2.
 | `Cs2Simulator/` | Console app: DI bootstrap, interactive CLI, `ConsoleStepGate`. |
 | `Cs2Simulator.Tests/` | xUnit tests: catalog discovery, JSON contract via `GsiSnapshotMapper`, per-scenario invariants, runner behavior, end-to-end `EventDetector` fidelity. |
 
-All target `net8.0` to match `GsiHost` and `GsiHost.Tests`.
+Simulator projects stay `net8.0`. `GsiHost` multi-targets `net8.0-windows10.0.19041.0` and `net8.0` (the latter only so `Cs2Simulator.Tests` can keep referencing host DTOs). `GsiHost.Tests` is Windows-only.
 
 ## Quick start
 
 In one terminal:
 
 ```powershell
-dotnet run --project .\GsiHost
+dotnet run --project .\GsiHost -f net8.0-windows10.0.19041.0
 ```
 
 In a second terminal:
