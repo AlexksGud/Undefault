@@ -13,6 +13,16 @@ namespace GsiHost.Services;
 
 public sealed class JsonControlProfileService : IControlProfileService
 {
+    public const string FlowProfileId = "flow";
+    public const string FocusProfileId = "focus";
+
+    /// <summary>
+    /// Legacy id from pre-preset <c>control-profiles.json</c> files. Resolves to
+    /// <see cref="FlowProfileId"/> when that profile is absent so ActiveProfileId
+    /// is not rewritten to an unknown value.
+    /// </summary>
+    public const string ConsoleDefaultAliasId = "console-default";
+
     private readonly ILogger<JsonControlProfileService> _logger;
     private readonly SemaphoreSlim _mutex = new(1, 1);
 
@@ -93,17 +103,35 @@ public sealed class JsonControlProfileService : IControlProfileService
     private static ConsoleControlProfilesConfig BuildDefaultConfig()
     {
         return new ConsoleControlProfilesConfig(
-            "console-default",
+            FlowProfileId,
             new List<ConsoleControlProfile>
             {
-                new(
-                    "console-default",
-                    "Console Default",
-                    new List<EventControlRule>
-                    {
-                        new(EventKeys.RoundStart, MusicControlCommands.Resume),
-                        new(EventKeys.Death, MusicControlCommands.Pause)
-                    })
+                CreateFlowProfile(),
+                CreateFocusProfile()
+            });
+    }
+
+    private static ConsoleControlProfile CreateFlowProfile()
+    {
+        return new(
+            FlowProfileId,
+            "Flow",
+            new List<EventControlRule>
+            {
+                new(EventKeys.RoundStart, MusicControlCommands.Resume),
+                new(EventKeys.Death, MusicControlCommands.Pause)
+            });
+    }
+
+    private static ConsoleControlProfile CreateFocusProfile()
+    {
+        return new(
+            FocusProfileId,
+            "Focus",
+            new List<EventControlRule>
+            {
+                new(EventKeys.RoundStart, MusicControlCommands.Pause),
+                new(EventKeys.Death, MusicControlCommands.Resume)
             });
     }
 
@@ -118,18 +146,40 @@ public sealed class JsonControlProfileService : IControlProfileService
             .Select(NormalizeProfile)
             .ToList();
 
-        var activeProfileId = string.IsNullOrWhiteSpace(config.ActiveProfileId)
-            ? profiles[0].Id
-            : config.ActiveProfileId.Trim();
-
-        if (!profiles.Any(profile => string.Equals(profile.Id, activeProfileId, StringComparison.OrdinalIgnoreCase)))
-        {
-            activeProfileId = profiles[0].Id;
-        }
+        var activeProfileId = ResolveActiveProfileId(config.ActiveProfileId, profiles);
 
         var normalized = new ConsoleControlProfilesConfig(activeProfileId, profiles);
         Validate(normalized);
         return normalized;
+    }
+
+    private static string ResolveActiveProfileId(string? requestedId, IReadOnlyList<ConsoleControlProfile> profiles)
+    {
+        if (string.IsNullOrWhiteSpace(requestedId))
+        {
+            return FindProfileId(profiles, FlowProfileId) ?? profiles[0].Id;
+        }
+
+        var trimmed = requestedId.Trim();
+        if (FindProfileId(profiles, trimmed) is not null)
+        {
+            return trimmed;
+        }
+
+        if (string.Equals(trimmed, ConsoleDefaultAliasId, StringComparison.OrdinalIgnoreCase)
+            && FindProfileId(profiles, FlowProfileId) is { } flowId)
+        {
+            return flowId;
+        }
+
+        return profiles[0].Id;
+    }
+
+    private static string? FindProfileId(IReadOnlyList<ConsoleControlProfile> profiles, string id)
+    {
+        return profiles
+            .FirstOrDefault(profile => string.Equals(profile.Id, id, StringComparison.OrdinalIgnoreCase))
+            ?.Id;
     }
 
     private static ConsoleControlProfile NormalizeProfile(ConsoleControlProfile profile)
