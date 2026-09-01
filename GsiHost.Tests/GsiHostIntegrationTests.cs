@@ -1063,9 +1063,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
         }
 
         public Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken = default) => Task.FromResult(Authenticated);
-        public Task<string> GetAuthorizationUrlAsync(string state, CancellationToken cancellationToken = default) => Task.FromResult(string.Empty);
-        public Task<SpotifyAuthResult> AuthenticateAsync(string authorizationCode, string state, CancellationToken cancellationToken = default)
-            => Task.FromResult(new SpotifyAuthResult(string.Empty, string.Empty, DateTimeOffset.UtcNow, Array.Empty<string>()));
     }
 
     private sealed class ThrowingSpotifyClient : ISpotifyClient
@@ -1081,9 +1078,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
         public Task ResumeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SetVolumeAsync(int volume, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<bool> IsAuthenticatedAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
-        public Task<string> GetAuthorizationUrlAsync(string state, CancellationToken cancellationToken = default) => Task.FromResult(string.Empty);
-        public Task<SpotifyAuthResult> AuthenticateAsync(string authorizationCode, string state, CancellationToken cancellationToken = default)
-            => Task.FromResult(new SpotifyAuthResult(string.Empty, string.Empty, DateTimeOffset.UtcNow, Array.Empty<string>()));
     }
 
     private TestHostContext CreateTestHost(

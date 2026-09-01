@@ -9,256 +9,108 @@ namespace GsiHost.Tests;
 public sealed class ConsoleLaunchBootstrapTests
 {
     [Fact]
-    public void Prepare_DefaultLaunch_UsesMockLeftoverSpotify_AndTauonMusicProvider()
+    public void Prepare_DefaultLaunch_UsesTauonMusicProvider_AndEmitsNoSpotifyCredentialOverrides()
     {
-        RunWithoutSpotifyEnvVars(() =>
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["UseMockSpotify"] = "false",
-                ["Spotify:ClientId"] = "configured-client-id",
-                ["Spotify:RedirectUri"] = "http://127.0.0.1:5292/callback",
-                ["Gsi:Url"] = "http://127.0.0.1:5292"
-            });
-            var prompter = new FakeConsoleCredentialPrompter();
-            var store = new FakeSpotifySecretStore();
-
-            var settings = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                Array.Empty<string>(),
-                isInteractiveConsole: false,
-                prompter,
-                store);
-
-            settings.HasSpotifyCredentials.Should().BeFalse();
-            settings.PromptedForCredentials.Should().BeFalse();
-            settings.ConfigurationOverrides["UseMockSpotify"].Should().Be("true");
-            settings.ConfigurationOverrides["Music:Provider"].Should().Be("Tauon");
-            settings.LoadedFromEncryptedStore.Should().BeFalse();
-            prompter.ValuePrompts.Should().Be(0);
+            ["Gsi:Url"] = "http://127.0.0.1:5292"
         });
+
+        var settings = ConsoleLaunchBootstrap.Prepare(configuration, Array.Empty<string>());
+
+        settings.ConfigurationOverrides["Music:Provider"].Should().Be("Tauon");
+        settings.ConfigurationOverrides.Keys.Should().NotContain(key =>
+            key.StartsWith("Spotify:", StringComparison.OrdinalIgnoreCase));
+        settings.ConfigurationOverrides.ContainsKey("UseMockSpotify").Should().BeFalse(
+            "UND-84 deleted the real-client switch; the leftover client is always the mock");
     }
 
     [Fact]
     public void Prepare_NormalizesLoopbackUrls()
     {
-        RunWithoutSpotifyEnvVars(() =>
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["Spotify:RedirectUri"] = "http://localhost:5292/callback",
-                ["Gsi:Url"] = "http://localhost:5292"
-            });
-            var store = new FakeSpotifySecretStore();
-
-            var settings = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                Array.Empty<string>(),
-                isInteractiveConsole: false,
-                new FakeConsoleCredentialPrompter(),
-                store);
-
-            settings.GsiBaseUrl.Should().Be("http://127.0.0.1:5292");
-            settings.RedirectUri.Should().Be("http://127.0.0.1:5292/callback");
+            ["Gsi:Url"] = "http://localhost:5292"
         });
+
+        var settings = ConsoleLaunchBootstrap.Prepare(configuration, Array.Empty<string>());
+
+        settings.GsiBaseUrl.Should().Be("http://127.0.0.1:5292");
     }
 
     [Fact]
-    public void Prepare_PromptsForMissingClientId_WhenInteractive_AndDoesNotAskForClientSecret()
+    public void Prepare_QuickLaunch_UsesMockMusicProvider_AndSkipsOptionalStartup()
     {
-        RunWithoutSpotifyEnvVars(() =>
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["Gsi:Url"] = "http://127.0.0.1:5292"
-            });
-            var prompter = new FakeConsoleCredentialPrompter("prompted-client-id");
-            var store = new FakeSpotifySecretStore();
-
-            var settings = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                new[] { "--use-real-spotify" },
-                isInteractiveConsole: true,
-                prompter,
-                store);
-
-            settings.HasSpotifyCredentials.Should().BeTrue();
-            settings.PromptedForCredentials.Should().BeTrue();
-            settings.SavedToEncryptedStore.Should().BeTrue();
-            settings.ConfigurationOverrides["Spotify:ClientId"].Should().Be("prompted-client-id");
-            settings.ConfigurationOverrides.ContainsKey("Spotify:ClientSecret").Should().BeFalse(
-                "PKCE flow has no client_secret");
-            store.SavedSecrets.Should().BeEquivalentTo(new SpotifyLocalSecrets("prompted-client-id"));
-            prompter.ValuePrompts.Should().Be(1);
+            ["Gsi:Url"] = "http://127.0.0.1:5292"
         });
-    }
 
-    [Fact]
-    public void Prepare_LoadsClientIdFromEncryptedStore_WithoutPrompting()
-    {
-        RunWithoutSpotifyEnvVars(() =>
-        {
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["Gsi:Url"] = "http://127.0.0.1:5292"
-            });
-            var store = new FakeSpotifySecretStore
-            {
-                StoredSecrets = new SpotifyLocalSecrets("stored-client-id")
-            };
+        var settings = ConsoleLaunchBootstrap.Prepare(configuration, new[] { "--quick" });
 
-            var settings = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                new[] { "--use-real-spotify" },
-                isInteractiveConsole: true,
-                new FakeConsoleCredentialPrompter(),
-                store);
-
-            settings.HasSpotifyCredentials.Should().BeTrue();
-            settings.LoadedFromEncryptedStore.Should().BeTrue();
-            settings.PromptedForCredentials.Should().BeFalse();
-            settings.ConfigurationOverrides["Spotify:ClientId"].Should().Be("stored-client-id");
-            settings.ConfigurationOverrides.ContainsKey("Spotify:ClientSecret").Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Prepare_QuickLaunch_UsesMockSpotify_NoPrompt_AndSkipsOptionalStartup()
-    {
-        RunWithoutSpotifyEnvVars(() =>
-        {
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["Gsi:Url"] = "http://127.0.0.1:5292"
-            });
-
-            var prompter = new FakeConsoleCredentialPrompter("prompted-client-id");
-            var store = new FakeSpotifySecretStore();
-
-            var settings = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                new[] { "--quick" },
-                isInteractiveConsole: true,
-                prompter,
-                store);
-
-            settings.IsQuickLaunch.Should().BeTrue();
-            settings.SkipCs2Setup.Should().BeTrue();
-            settings.SkipSmartTrackWarmup.Should().BeTrue();
-
-            settings.HasSpotifyCredentials.Should().BeFalse();
-            settings.PromptedForCredentials.Should().BeFalse();
-            settings.ConfigurationOverrides["UseMockSpotify"].Should().Be("true");
-            settings.ConfigurationOverrides["Music:Provider"].Should().Be("Mock");
-
-            prompter.ValuePrompts.Should().Be(0);
-        });
-    }
-
-    [Fact]
-    public void Prepare_UseRealSpotifyOverridesQuickLaunchAndRestoresNormalStartup()
-    {
-        RunWithoutSpotifyEnvVars(() =>
-        {
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["Gsi:Url"] = "http://127.0.0.1:5292"
-            });
-
-            var settings = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                new[] { "--quick", "--use-real-spotify" },
-                isInteractiveConsole: false,
-                new FakeConsoleCredentialPrompter(),
-                new FakeSpotifySecretStore());
-
-            settings.IsQuickLaunch.Should().BeFalse();
-            settings.SkipCs2Setup.Should().BeFalse();
-            settings.SkipSmartTrackWarmup.Should().BeFalse();
-            settings.ConfigurationOverrides["UseMockSpotify"].Should().Be("false");
-        });
+        settings.IsQuickLaunch.Should().BeTrue();
+        settings.SkipCs2Setup.Should().BeTrue();
+        settings.SkipSmartTrackWarmup.Should().BeTrue();
+        settings.ConfigurationOverrides["Music:Provider"].Should().Be("Mock");
     }
 
     [Fact]
     public void Prepare_MvpFlag_SetsIntentCaptureAndEnablesAllFeatureFlagsInMemory()
     {
-        RunWithoutSpotifyEnvVars(() =>
+        // UND-66 / UND-78: --mvp is the one-command MVP launch. It implies intent_capture
+        // and turns Timeline / PlaybackObserver ON via in-memory overrides, without
+        // flipping the git-tracked appsettings default. The user controls playback via
+        // the keyboard media play/pause key; Undefault only observes and records.
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            // UND-66 / UND-78: --mvp is the one-command MVP launch. It implies intent_capture
-            // and turns Timeline / PlaybackObserver ON via in-memory overrides, without
-            // flipping the git-tracked appsettings default. The user controls playback via
-            // the keyboard media play/pause key; Undefault only observes and records.
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["Gsi:Url"] = "http://127.0.0.1:5292"
-            });
-
-            var settings = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                new[] { "--mvp" },
-                isInteractiveConsole: false,
-                new FakeConsoleCredentialPrompter(),
-                new FakeSpotifySecretStore());
-
-            settings.IsMvpLaunch.Should().BeTrue();
-            settings.ConfigurationOverrides["Runtime:Mode"].Should().Be("intent_capture");
-            settings.ConfigurationOverrides["Timeline:Enabled"].Should().Be("true");
-            settings.ConfigurationOverrides["PlaybackObserver:Enabled"].Should().Be("true");
+            ["Gsi:Url"] = "http://127.0.0.1:5292"
         });
+
+        var settings = ConsoleLaunchBootstrap.Prepare(configuration, new[] { "--mvp" });
+
+        settings.IsMvpLaunch.Should().BeTrue();
+        settings.ConfigurationOverrides["Runtime:Mode"].Should().Be("intent_capture");
+        settings.ConfigurationOverrides["Timeline:Enabled"].Should().Be("true");
+        settings.ConfigurationOverrides["PlaybackObserver:Enabled"].Should().Be("true");
     }
 
     [Fact]
     public void Prepare_MvpFlag_WithScenarioPlayback_KeepsScenarioPlaybackModeButLeavesFlagsOn()
     {
-        RunWithoutSpotifyEnvVars(() =>
+        // Explicit --scenario-playback wins for the runtime mode; --mvp still turns
+        // the feature flags on (they are no-ops outside intent_capture).
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            // Explicit --scenario-playback wins for the runtime mode; --mvp still turns
-            // the feature flags on (they are no-ops outside intent_capture).
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["Gsi:Url"] = "http://127.0.0.1:5292"
-            });
-
-            var settings = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                new[] { "--mvp", "--scenario-playback" },
-                isInteractiveConsole: false,
-                new FakeConsoleCredentialPrompter(),
-                new FakeSpotifySecretStore());
-
-            settings.IsMvpLaunch.Should().BeTrue();
-            settings.ConfigurationOverrides["Runtime:Mode"].Should().Be("scenario_playback");
-            settings.ConfigurationOverrides["Timeline:Enabled"].Should().Be("true");
-            settings.ConfigurationOverrides["PlaybackObserver:Enabled"].Should().Be("true");
+            ["Gsi:Url"] = "http://127.0.0.1:5292"
         });
+
+        var settings = ConsoleLaunchBootstrap.Prepare(
+            configuration,
+            new[] { "--mvp", "--scenario-playback" });
+
+        settings.IsMvpLaunch.Should().BeTrue();
+        settings.ConfigurationOverrides["Runtime:Mode"].Should().Be("scenario_playback");
+        settings.ConfigurationOverrides["Timeline:Enabled"].Should().Be("true");
+        settings.ConfigurationOverrides["PlaybackObserver:Enabled"].Should().Be("true");
     }
 
     [Fact]
-    public void Prepare_MvpFlag_DoesNotForceMockSpotify_AndPreservesIntentCaptureFlagBehavior()
+    public void Prepare_MvpFlag_KeepsTauonMusicProvider_AndPreservesIntentCaptureFlagBehavior()
     {
-        RunWithoutSpotifyEnvVars(() =>
+        // --mvp is leftover tester tooling; it must not change the music provider.
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            // --mvp is leftover tester tooling. Leftover Spotify stays mock unless
-            // --use-real-spotify is passed; Music:Provider remains Tauon.
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["Spotify:ClientId"] = "configured-client-id",
-                ["Gsi:Url"] = "http://127.0.0.1:5292"
-            });
-
-            var settings = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                new[] { "--mvp", "--intent-capture" },
-                isInteractiveConsole: false,
-                new FakeConsoleCredentialPrompter(),
-                new FakeSpotifySecretStore());
-
-            settings.IsMvpLaunch.Should().BeTrue();
-            settings.ConfigurationOverrides["Runtime:Mode"].Should().Be("intent_capture");
-            settings.ConfigurationOverrides["PlaybackObserver:Enabled"].Should().Be("true");
-            settings.ConfigurationOverrides["UseMockSpotify"].Should().Be("true");
-            settings.ConfigurationOverrides["Music:Provider"].Should().Be("Tauon");
+            ["Gsi:Url"] = "http://127.0.0.1:5292"
         });
+
+        var settings = ConsoleLaunchBootstrap.Prepare(
+            configuration,
+            new[] { "--mvp", "--intent-capture" });
+
+        settings.IsMvpLaunch.Should().BeTrue();
+        settings.ConfigurationOverrides["Runtime:Mode"].Should().Be("intent_capture");
+        settings.ConfigurationOverrides["PlaybackObserver:Enabled"].Should().Be("true");
+        settings.ConfigurationOverrides["Music:Provider"].Should().Be("Tauon");
     }
 
     [Fact]
@@ -269,173 +121,10 @@ public sealed class ConsoleLaunchBootstrapTests
         (await client.IsAuthenticatedAsync()).Should().BeFalse();
     }
 
-    [Fact]
-    public void Prepare_ResetFlag_OverwritesEncryptedStore()
-    {
-        RunWithoutSpotifyEnvVars(() =>
-        {
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["Gsi:Url"] = "http://127.0.0.1:5292"
-            });
-            var store = new FakeSpotifySecretStore
-            {
-                StoredSecrets = new SpotifyLocalSecrets("old-client-id")
-            };
-            var prompter = new FakeConsoleCredentialPrompter("new-client-id");
-
-            var settings = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                new[] { "--reset-spotify-secrets", "--use-real-spotify" },
-                isInteractiveConsole: true,
-                prompter,
-                store);
-
-            settings.ResetEncryptedStoreRequested.Should().BeTrue();
-            settings.SavedToEncryptedStore.Should().BeTrue();
-            settings.LoadedFromEncryptedStore.Should().BeFalse();
-            store.SavedSecrets.Should().BeEquivalentTo(new SpotifyLocalSecrets("new-client-id"));
-        });
-    }
-
-    [Fact]
-    public void Prepare_ClearSpotifySecretsFlag_DeletesEncryptedStore_AndDoesNotThrow_WhenStoreIsEmpty()
-    {
-        RunWithoutSpotifyEnvVars(() =>
-        {
-            // UND-47: with PKCE there may be nothing to clear. The flag still wipes the
-            // store on demand without erroring out.
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["Gsi:Url"] = "http://127.0.0.1:5292"
-            });
-            var emptyStore = new FakeSpotifySecretStore();
-
-            var settingsEmpty = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                new[] { "--clear-spotify-secrets" },
-                isInteractiveConsole: false,
-                new FakeConsoleCredentialPrompter(),
-                emptyStore);
-
-            settingsEmpty.ClearedEncryptedStore.Should().BeFalse(
-                "an empty store has nothing to clear, but the flag must not throw");
-
-            var populatedStore = new FakeSpotifySecretStore
-            {
-                StoredSecrets = new SpotifyLocalSecrets("cached-client-id")
-            };
-
-            var settingsPopulated = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                new[] { "--clear-spotify-secrets" },
-                isInteractiveConsole: false,
-                new FakeConsoleCredentialPrompter(),
-                populatedStore);
-
-            settingsPopulated.ClearedEncryptedStore.Should().BeTrue();
-            populatedStore.StoredSecrets.Should().BeNull();
-        });
-    }
-
-    [Fact]
-    public void Prepare_LegacyClientSecretEnvVarPresent_IsSurfaced_ButNotConsumed()
-    {
-        RunWithoutSpotifyEnvVars(() =>
-        {
-            Environment.SetEnvironmentVariable("CLIENT_SECRET", "legacy-secret-should-be-ignored");
-
-            var configuration = BuildConfiguration(new Dictionary<string, string?>
-            {
-                ["Spotify:ClientId"] = "configured-client-id",
-                ["Gsi:Url"] = "http://127.0.0.1:5292"
-            });
-            var store = new FakeSpotifySecretStore();
-
-            var settings = ConsoleLaunchBootstrap.Prepare(
-                configuration,
-                Array.Empty<string>(),
-                isInteractiveConsole: false,
-                new FakeConsoleCredentialPrompter(),
-                store);
-
-            settings.LegacyClientSecretEnvVarPresent.Should().BeTrue();
-            settings.HasSpotifyCredentials.Should().BeFalse(
-                "default launch keeps leftover Spotify mock and does not consume CLIENT_ID");
-            settings.ConfigurationOverrides.ContainsKey("Spotify:ClientSecret").Should().BeFalse();
-        });
-    }
-
     private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
     {
         return new ConfigurationBuilder()
             .AddInMemoryCollection(values)
             .Build();
-    }
-
-    private static void RunWithoutSpotifyEnvVars(Action action)
-    {
-        var previousClientId = Environment.GetEnvironmentVariable("CLIENT_ID");
-        var previousClientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET");
-        Environment.SetEnvironmentVariable("CLIENT_ID", null);
-        Environment.SetEnvironmentVariable("CLIENT_SECRET", null);
-
-        try
-        {
-            action();
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("CLIENT_ID", previousClientId);
-            Environment.SetEnvironmentVariable("CLIENT_SECRET", previousClientSecret);
-        }
-    }
-
-    private sealed class FakeConsoleCredentialPrompter : IConsoleCredentialPrompter
-    {
-        private readonly string? _value;
-
-        public FakeConsoleCredentialPrompter(string? value = null)
-        {
-            _value = value;
-        }
-
-        public int ValuePrompts { get; private set; }
-
-        public string? ReadValue(string prompt)
-        {
-            ValuePrompts++;
-            return _value;
-        }
-    }
-
-    private sealed class FakeSpotifySecretStore : ISpotifySecretStore
-    {
-        public string FilePath => "C:\\fake\\spotify-secrets.bin";
-
-        public SpotifyLocalSecrets? StoredSecrets { get; set; }
-
-        public SpotifyLocalSecrets? SavedSecrets { get; private set; }
-
-        public bool Exists()
-        {
-            return StoredSecrets is not null;
-        }
-
-        public SpotifyLocalSecrets? TryLoad()
-        {
-            return StoredSecrets;
-        }
-
-        public void Save(SpotifyLocalSecrets secrets)
-        {
-            SavedSecrets = secrets;
-            StoredSecrets = secrets;
-        }
-
-        public void Delete()
-        {
-            StoredSecrets = null;
-        }
     }
 }
