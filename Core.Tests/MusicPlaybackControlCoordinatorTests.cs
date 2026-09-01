@@ -24,8 +24,9 @@ public class MusicPlaybackControlCoordinatorTests
         };
         var coordinator = BuildCoordinator(player);
 
-        await coordinator.TryPauseAsync("custom:music_pause");
+        var result = await coordinator.TryPauseAsync("custom:music_pause");
 
+        result.Should().Be(MusicCommandResult.Applied);
         player.PauseCalls.Should().Be(1);
         player.GetStateCalls.Should().Be(1);
         player.IsAvailableCalls.Should().Be(0);
@@ -41,8 +42,9 @@ public class MusicPlaybackControlCoordinatorTests
         };
         var coordinator = BuildCoordinator(player);
 
-        await coordinator.TryResumeAsync("custom:music_resume");
+        var result = await coordinator.TryResumeAsync("custom:music_resume");
 
+        result.Should().Be(MusicCommandResult.Applied);
         player.PlayCalls.Should().Be(1);
         player.ResumeCalls.Should().Be(0);
         player.GetStateCalls.Should().Be(1);
@@ -59,8 +61,9 @@ public class MusicPlaybackControlCoordinatorTests
         };
         var coordinator = BuildCoordinator(player);
 
-        await coordinator.TryResumeAsync(EventKeys.RoundStart);
+        var result = await coordinator.TryResumeAsync(EventKeys.RoundStart);
 
+        result.Should().Be(MusicCommandResult.Applied);
         player.PlayCalls.Should().Be(1);
         player.ResumeCalls.Should().Be(0);
         player.GetStateCalls.Should().Be(1);
@@ -77,8 +80,9 @@ public class MusicPlaybackControlCoordinatorTests
         };
         var coordinator = BuildCoordinator(player);
 
-        await coordinator.TryPauseAsync("custom:music_pause");
+        var result = await coordinator.TryPauseAsync("custom:music_pause");
 
+        result.Should().Be(MusicCommandResult.Applied);
         player.PauseCalls.Should().Be(0);
     }
 
@@ -92,8 +96,9 @@ public class MusicPlaybackControlCoordinatorTests
         };
         var coordinator = BuildCoordinator(player);
 
-        await coordinator.TryResumeAsync("custom:music_resume");
+        var result = await coordinator.TryResumeAsync("custom:music_resume");
 
+        result.Should().Be(MusicCommandResult.Applied);
         player.PlayCalls.Should().Be(0);
         player.ResumeCalls.Should().Be(0);
     }
@@ -108,8 +113,9 @@ public class MusicPlaybackControlCoordinatorTests
         };
         var coordinator = BuildCoordinator(player);
 
-        await coordinator.TryPauseAsync("custom:music_pause");
+        var result = await coordinator.TryPauseAsync("custom:music_pause");
 
+        AssertNonApplied(result, MusicCommandOutcome.Unavailable);
         player.PauseCalls.Should().Be(0);
     }
 
@@ -123,8 +129,9 @@ public class MusicPlaybackControlCoordinatorTests
         };
         var coordinator = BuildCoordinator(player);
 
-        await coordinator.TryPauseAsync("custom:music_pause");
+        var result = await coordinator.TryPauseAsync("custom:music_pause");
 
+        AssertNonApplied(result, MusicCommandOutcome.Unavailable);
         player.PauseCalls.Should().Be(0);
     }
 
@@ -134,9 +141,11 @@ public class MusicPlaybackControlCoordinatorTests
         var player = new FakeMusicPlayer { Available = true, State = Playing() };
         var coordinator = BuildCoordinator(player);
 
-        await coordinator.TryNextAsync("custom:next");
-        await coordinator.TryPreviousAsync("custom:previous");
+        var next = await coordinator.TryNextAsync("custom:next");
+        var previous = await coordinator.TryPreviousAsync("custom:previous");
 
+        next.Should().Be(MusicCommandResult.Applied);
+        previous.Should().Be(MusicCommandResult.Applied);
         player.NextCalls.Should().Be(1);
         player.PreviousCalls.Should().Be(1);
     }
@@ -152,8 +161,10 @@ public class MusicPlaybackControlCoordinatorTests
         };
         var coordinator = BuildCoordinator(player);
 
-        var act = async () => await coordinator.TryPauseAsync(EventKeys.Death);
-        await act.Should().NotThrowAsync();
+        var result = await coordinator.TryPauseAsync(EventKeys.Death);
+
+        result.Outcome.Should().Be(MusicCommandOutcome.Failed);
+        result.Reason.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -185,6 +196,12 @@ public class MusicPlaybackControlCoordinatorTests
             }),
             recorder: null,
             NullLogger<MusicPlaybackControlCoordinator>.Instance);
+    }
+
+    private static void AssertNonApplied(MusicCommandResult result, MusicCommandOutcome outcome)
+    {
+        result.Outcome.Should().Be(outcome);
+        result.Reason.Should().NotBeNullOrWhiteSpace();
     }
 
     private static MusicPlaybackState Playing() => new(
@@ -226,14 +243,14 @@ internal sealed class FakeMusicPlayer : IMusicPlayer
         return Task.FromResult(Available ? State : null);
     }
 
-    public Task PlayAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> PlayAsync(CancellationToken cancellationToken = default)
     {
         PlayCalls++;
         State = State is null ? null : State with { Status = PlaybackStatus.Playing };
-        return Task.CompletedTask;
+        return Task.FromResult(MusicCommandResult.Applied);
     }
 
-    public Task PauseAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> PauseAsync(CancellationToken cancellationToken = default)
     {
         PauseCalls++;
         if (ThrowOnPause)
@@ -242,32 +259,32 @@ internal sealed class FakeMusicPlayer : IMusicPlayer
         }
 
         State = State is null ? null : State with { Status = PlaybackStatus.Paused };
-        return Task.CompletedTask;
+        return Task.FromResult(MusicCommandResult.Applied);
     }
 
-    public Task ResumeAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> ResumeAsync(CancellationToken cancellationToken = default)
     {
         ResumeCalls++;
         State = State is null ? null : State with { Status = PlaybackStatus.Playing };
-        return Task.CompletedTask;
+        return Task.FromResult(MusicCommandResult.Applied);
     }
 
-    public Task NextAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> NextAsync(CancellationToken cancellationToken = default)
     {
         NextCalls++;
-        return Task.CompletedTask;
+        return Task.FromResult(MusicCommandResult.Applied);
     }
 
-    public Task PreviousAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> PreviousAsync(CancellationToken cancellationToken = default)
     {
         PreviousCalls++;
-        return Task.CompletedTask;
+        return Task.FromResult(MusicCommandResult.Applied);
     }
 
-    public Task SetVolumeAsync(int volumePercent, CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> SetVolumeAsync(int volumePercent, CancellationToken cancellationToken = default)
     {
         VolumeCalls.Add(volumePercent);
         State = State is null ? null : State with { VolumePercent = volumePercent };
-        return Task.CompletedTask;
+        return Task.FromResult(MusicCommandResult.Applied);
     }
 }

@@ -106,7 +106,7 @@ public sealed class MockMusicPlayer : IMusicPlayer
     }
 
     /// <inheritdoc />
-    public Task PlayAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> PlayAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_sync)
@@ -114,7 +114,7 @@ public sealed class MockMusicPlayer : IMusicPlayer
             PlayCalls++;
             if (!_available)
             {
-                return Task.CompletedTask;
+                return UnavailableTask("play");
             }
 
             _status = PlaybackStatus.Playing;
@@ -122,11 +122,11 @@ public sealed class MockMusicPlayer : IMusicPlayer
         }
 
         _logger.LogInformation("[MOCK] Would play");
-        return Task.CompletedTask;
+        return AppliedTask();
     }
 
     /// <inheritdoc />
-    public Task PauseAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> PauseAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_sync)
@@ -134,7 +134,7 @@ public sealed class MockMusicPlayer : IMusicPlayer
             PauseCalls++;
             if (!_available)
             {
-                return Task.CompletedTask;
+                return UnavailableTask("pause");
             }
 
             if (_status == PlaybackStatus.Playing)
@@ -144,11 +144,11 @@ public sealed class MockMusicPlayer : IMusicPlayer
         }
 
         _logger.LogInformation("[MOCK] Would pause playback");
-        return Task.CompletedTask;
+        return AppliedTask();
     }
 
     /// <inheritdoc />
-    public Task ResumeAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> ResumeAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_sync)
@@ -156,7 +156,7 @@ public sealed class MockMusicPlayer : IMusicPlayer
             ResumeCalls++;
             if (!_available)
             {
-                return Task.CompletedTask;
+                return UnavailableTask("resume");
             }
 
             if (_status != PlaybackStatus.Playing)
@@ -167,37 +167,45 @@ public sealed class MockMusicPlayer : IMusicPlayer
         }
 
         _logger.LogInformation("[MOCK] Would resume playback");
-        return Task.CompletedTask;
+        return AppliedTask();
     }
 
     /// <inheritdoc />
-    public Task NextAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> NextAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_sync)
         {
             NextCalls++;
+            if (!_available)
+            {
+                return UnavailableTask("next");
+            }
         }
 
         _logger.LogInformation("[MOCK] Would skip to next track");
-        return Task.CompletedTask;
+        return AppliedTask();
     }
 
     /// <inheritdoc />
-    public Task PreviousAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> PreviousAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_sync)
         {
             PreviousCalls++;
+            if (!_available)
+            {
+                return UnavailableTask("previous");
+            }
         }
 
         _logger.LogInformation("[MOCK] Would skip to previous track");
-        return Task.CompletedTask;
+        return AppliedTask();
     }
 
     /// <inheritdoc />
-    public Task SetVolumeAsync(int volumePercent, CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> SetVolumeAsync(int volumePercent, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (volumePercent is < 0 or > 100)
@@ -208,15 +216,23 @@ public sealed class MockMusicPlayer : IMusicPlayer
         lock (_sync)
         {
             VolumeCalls.Add(volumePercent);
-            if (_available)
+            if (!_available)
             {
-                _volume = volumePercent;
+                return UnavailableTask("setvolume");
             }
+
+            _volume = volumePercent;
         }
 
         _logger.LogInformation("[MOCK] Would set volume to {Volume}%", volumePercent);
-        return Task.CompletedTask;
+        return AppliedTask();
     }
+
+    private static Task<MusicCommandResult> AppliedTask()
+        => Task.FromResult(MusicCommandResult.Applied);
+
+    private static Task<MusicCommandResult> UnavailableTask(string operation)
+        => Task.FromResult(MusicCommandResult.Unavailable($"Mock player is not available for {operation}."));
 
     /// <summary>
     /// Seeds playback status for tests without going through transport methods.

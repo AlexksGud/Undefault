@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Core.Music;
 
@@ -9,8 +10,8 @@ namespace GsiHost.Players;
 /// <remarks>
 /// Calls loopback <c>GET /api1/*</c> paths only. Each call uses
 /// <see cref="IHttpClientFactory.CreateClient(string)"/> so the named client's handler is not
-/// cached past the factory lifetime. Failures are logged and swallowed except caller cancellation
-/// and out-of-range volume.
+/// cached past the factory lifetime. Transport failures are logged and returned as
+/// <see cref="MusicCommandResult"/> except caller cancellation and out-of-range volume.
 /// </remarks>
 public sealed class TauonMusicPlayer : IMusicPlayer
 {
@@ -81,11 +82,11 @@ public sealed class TauonMusicPlayer : IMusicPlayer
     }
 
     /// <inheritdoc />
-    public Task PlayAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> PlayAsync(CancellationToken cancellationToken = default)
         => SendTransportAsync(PlayPath, "play", cancellationToken);
 
     /// <inheritdoc />
-    public Task PauseAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> PauseAsync(CancellationToken cancellationToken = default)
         => SendTransportAsync(PausePath, "pause", cancellationToken);
 
     /// <inheritdoc />
@@ -93,30 +94,30 @@ public sealed class TauonMusicPlayer : IMusicPlayer
     /// Tauon has no <c>/resume</c> endpoint. This reads <c>GET api1/status</c> and issues
     /// <c>GET api1/play</c> only when status is not already playing.
     /// </remarks>
-    public async Task ResumeAsync(CancellationToken cancellationToken = default)
+    public async Task<MusicCommandResult> ResumeAsync(CancellationToken cancellationToken = default)
     {
         var state = await GetStateAsync(cancellationToken).ConfigureAwait(false);
         if (state?.Status == PlaybackStatus.Playing)
         {
-            return;
+            return MusicCommandResult.Applied;
         }
 
-        await PlayAsync(cancellationToken).ConfigureAwait(false);
+        return await PlayAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public Task NextAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> NextAsync(CancellationToken cancellationToken = default)
         => SendTransportAsync(NextPath, "next", cancellationToken);
 
     /// <inheritdoc />
-    public Task PreviousAsync(CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> PreviousAsync(CancellationToken cancellationToken = default)
         => SendTransportAsync(PreviousPath, "previous", cancellationToken);
 
     /// <inheritdoc />
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="volumePercent"/> is less than 0 or greater than 100.
     /// </exception>
-    public async Task SetVolumeAsync(int volumePercent, CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> SetVolumeAsync(int volumePercent, CancellationToken cancellationToken = default)
     {
         if (volumePercent is < 0 or > 100)
         {
@@ -126,22 +127,30 @@ public sealed class TauonMusicPlayer : IMusicPlayer
                 "Volume must be between 0 and 100.");
         }
 
-        await SendTransportAsync($"api1/setvolume/{volumePercent}", "setvolume", cancellationToken)
-            .ConfigureAwait(false);
+        return SendTransportAsync($"api1/setvolume/{volumePercent}", "setvolume", cancellationToken);
     }
 
-    private async Task SendTransportAsync(string relativePath, string action, CancellationToken cancellationToken)
+    private async Task<MusicCommandResult> SendTransportAsync(
+        string relativePath,
+        string action,
+        CancellationToken cancellationToken)
     {
         try
         {
             using var response = await CreateClient().GetAsync(relativePath, cancellationToken).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
+            if (response.IsSuccessStatusCode)
             {
-                _logger.LogWarning(
-                    "Tauon {Action} returned HTTP {StatusCode}.",
-                    action,
-                    (int)response.StatusCode);
+                var malformed = await TryMapMalformedJsonAsync(response, action, cancellationToken)
+                    .ConfigureAwait(false);
+                return malformed ?? MusicCommandResult.Applied;
             }
+
+            var statusCode = (int)response.StatusCode;
+            _logger.LogWarning(
+                "Tauon {Action} returned HTTP {StatusCode}.",
+                action,
+                statusCode);
+            return MapHttpFailure(action, response.StatusCode);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -150,7 +159,70 @@ public sealed class TauonMusicPlayer : IMusicPlayer
         catch (Exception ex) when (IsSoftFailure(ex))
         {
             _logger.LogWarning(ex, "Tauon {Action} failed.", action);
+            return MapSoftFailure(action, ex);
         }
+    }
+
+    private async Task<MusicCommandResult?> TryMapMalformedJsonAsync(
+        HttpResponseMessage response,
+        string action,
+        CancellationToken cancellationToken)
+    {
+        var mediaType = response.Content.Headers.ContentType?.MediaType;
+        if (mediaType is null || mediaType.IndexOf("json", StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            return null;
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            using (JsonDocument.Parse(json))
+            {
+                return null;
+            }
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Tauon {Action} returned malformed JSON.", action);
+            return MusicCommandResult.Rejected($"Tauon {action} returned malformed JSON.");
+        }
+    }
+
+    private static MusicCommandResult MapHttpFailure(string action, HttpStatusCode statusCode)
+    {
+        var status = (int)statusCode;
+        if (statusCode == HttpStatusCode.NotFound)
+        {
+            return MusicCommandResult.Unsupported($"Tauon {action} returned HTTP 404.");
+        }
+
+        if (status is >= 400 and < 500)
+        {
+            return MusicCommandResult.Rejected($"Tauon {action} returned HTTP {status}.");
+        }
+
+        return MusicCommandResult.Failed($"Tauon {action} returned HTTP {status}.");
+    }
+
+    private static MusicCommandResult MapSoftFailure(string action, Exception ex)
+    {
+        if (ex is JsonException)
+        {
+            return MusicCommandResult.Rejected($"Tauon {action} returned malformed JSON: {ex.Message}");
+        }
+
+        if (ex is HttpRequestException)
+        {
+            return MusicCommandResult.Unavailable($"Tauon {action} could not connect: {ex.Message}");
+        }
+
+        return MusicCommandResult.Failed($"Tauon {action} timed out or failed: {ex.Message}");
     }
 
     private async Task<JsonElement?> TryReadStatusObjectAsync(CancellationToken cancellationToken)
