@@ -20,13 +20,15 @@ That is **Flow**: music during the round, pause on death. **Focus** (quiet while
 - A CS2 companion (match accept, OBS, overlays, custom MVP files)
 - A jukebox or in-game music kit
 - A synchronized soundtrack
-- A Spotify product. Spotify is dropped; leftover code is deletion-only. See [docs/spotify-constraints.md](docs/spotify-constraints.md).
+- A Spotify product. Spotify is dropped; leftover `appsettings.json` keys are deletion-only. See [docs/spotify-constraints.md](docs/spotify-constraints.md).
 
 ## Current vs planned
 
-**Shipped on `main`:** CS2 Game State Integration → events → `IMusicPlayer`. Default backend is [Tauon Music Box](docs/tauon-integration.md) over loopback HTTP. `--quick` uses an in-process mock so you can run the pipeline without Tauon or CS2.
+**Shipped on `main`:** CS2 Game State Integration → events → `IMusicPlayer`. Default backend is [Tauon Music Box](docs/tauon-integration.md) over loopback HTTP. `Music:Provider=Smtc` commands a Windows media session by exact `SourceAppUserModelId` ([SMTC](docs/windows-smtc-integration.md)). `--quick` uses an in-process mock.
 
-**Not shipped:** picking a Windows media session (SMTC), an onboarding UI, extra games as a full automation path. Dota 2 currently logs GSI only.
+Local onboarding: run the Windows TFM host and open `http://127.0.0.1:5292/` (`wwwroot/index.html`). Session list and pick require `Music:Provider=Smtc`; with default Tauon, `GET /music/sessions` is empty and `POST /music/session` is 409.
+
+**Not a full product path yet:** extra games as automation. Dota 2 currently logs GSI only. Several **owner-run** live checks are still unproven (Tauon+CS2 smoke, published SMTC pause/resume, SMTC reattach after kill/restart, Win10 unpackaged publish). See [docs/roadmap.md](docs/roadmap.md).
 
 ## Quick start (mock, ~2 min)
 
@@ -38,11 +40,11 @@ dotnet run --project .\GsiHost -f net8.0-windows10.0.19041.0 -- --quick
 dotnet run --project .\Cs2Simulator
 ```
 
-Open `http://127.0.0.1:5292/status`. The host console should show `round_start` / `death`.
+Open `http://127.0.0.1:5292/` (onboarding page) or `http://127.0.0.1:5292/status`. The host console should show `round_start` / `death`.
 
 `--quick` sets `Music:Provider=Mock`. It does not talk to Tauon.
 
-Tauon runbook: [docs/tauon-integration.md](docs/tauon-integration.md). Flags: [docs/quick-launch.md](docs/quick-launch.md).
+Tauon runbook: [docs/tauon-integration.md](docs/tauon-integration.md). SMTC: [docs/windows-smtc-integration.md](docs/windows-smtc-integration.md). Flags: [docs/quick-launch.md](docs/quick-launch.md).
 
 ## How it runs
 
@@ -57,6 +59,7 @@ flowchart LR
   rules --> actions[IEventAction]
   actions --> player[IMusicPlayer]
   player --> tauon[Tauon]
+  player --> smtc[SMTC]
   player --> mock[Mock]
 ```
 
@@ -67,16 +70,17 @@ CS2 or the simulator posts JSON to the host. The host normalizes state, detects 
 | Project | Role |
 | --- | --- |
 | `Core/` | Models, diffing, events, rules, playback contracts |
-| `GsiHost/` | HTTP host, GSI mapping, CS2 setup, player adapters |
+| `GsiHost/` | HTTP host, GSI mapping, CS2 setup, player adapters, localhost onboarding page |
 | `Cs2Simulator*` | Local GSI payloads so you can iterate without the game |
 | `tools/SmtcSpike/` | Throwaway Windows media-session harness (evidence only) |
 | `*.Tests/` | Unit and integration tests (CI on `windows-latest`) |
 
 ## Limits
 
-- Windows-first (CS2 cfg install and console launch)
-- No desktop UI — console checklist plus local HTTP
+- Windows-first (CS2 cfg install, SMTC, and console launch)
+- No desktop app — console checklist plus localhost HTTP (`GET /`)
 - Tauon remote API has no auth; keep it on loopback; do not expose port 7814
+- SMTC has no volume; exact session id only
 - Safety/mixer specs exist; live mixer side effects are not wired
 - Dota 2: `POST /gsi/dota` logs; no music actions yet
 
@@ -86,9 +90,11 @@ CS2 or the simulator posts JSON to the host. The host normalizes state, detects 
 | --- | --- |
 | [docs/README.md](docs/README.md) | Index |
 | [docs/product-pivot-2026-08-14.md](docs/product-pivot-2026-08-14.md) | Locked product direction |
-| [docs/roadmap.md](docs/roadmap.md) | Backlog (`PIVOT-*` maps to Linear) |
+| [docs/smtc-onboarding-decision-2026-09-01.md](docs/smtc-onboarding-decision-2026-09-01.md) | SMTC + localhost onboarding |
+| [docs/roadmap.md](docs/roadmap.md) | Backlog (`PIVOT-*` maps to Linear); unproven live checks |
 | [docs/tauon-integration.md](docs/tauon-integration.md) | Tauon HTTP setup |
-| [docs/music-provider-architecture.md](docs/music-provider-architecture.md) | `IMusicPlayer` contracts |
+| [docs/windows-smtc-integration.md](docs/windows-smtc-integration.md) | SMTC adapter and onboarding HTTP |
+| [docs/music-provider-architecture.md](docs/music-provider-architecture.md) | `IMusicPlayer` contracts and capability matrix |
 | [docs/spotify-constraints.md](docs/spotify-constraints.md) | Why Spotify is not a backend |
 | [docs/quick-launch.md](docs/quick-launch.md) | Current binary flags |
 | [docs/backend-architecture.md](docs/backend-architecture.md) | Pipeline and HTTP as implemented |

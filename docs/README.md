@@ -1,17 +1,20 @@
 # Documentation
 
-Long-form documentation for UndefaultIt. The [repository README](../README.md) is the short overview. Start with the [product pivot](product-pivot-2026-08-14.md) if you need the current direction.
+Long-form documentation for UndefaultIt. The [repository README](../README.md) is the short overview. Start with the [product pivot](product-pivot-2026-08-14.md) if you need the 2026-08-14 direction, then the [SMTC onboarding decision](smtc-onboarding-decision-2026-09-01.md) for what shipped after that.
 
-**Code vs docs:** live automation is Tauon/`IMusicPlayer` (`PIVOT-1`–`PIVOT-8`). Leftover Spotify remains until `PIVOT-10`. Live Tauon smoke: `PIVOT-9` in [roadmap.md](roadmap.md).
+**Code vs docs:** live automation is `IMusicPlayer` (Tauon default, SMTC, Mock). Spotify is not a provider (excision UND-84 / UND-101). Owner-run live checks: [roadmap.md](roadmap.md).
 
 ## Product
 
 | Document | What it covers |
 |----------|----------------|
 | [Product pivot (2026-08-14)](product-pivot-2026-08-14.md) | Locked direction: automation layer, Tauon first |
-| [Roadmap](roadmap.md) | `PIVOT-*` tasks, current vs target, later work |
-| [Music provider architecture](music-provider-architecture.md) | Target `IMusicPlayer` / coordinator / config |
+| [SMTC onboarding decision (2026-09-01)](smtc-onboarding-decision-2026-09-01.md) | SMTC adapter + localhost onboarding; UI non-goal superseded |
+| [Roadmap](roadmap.md) | `PIVOT-*` tasks, current vs target, unproven live checks |
+| [Music provider architecture](music-provider-architecture.md) | Registry, capability matrix, coordinator gate |
 | [Tauon integration](tauon-integration.md) | Remote API, security, setup (`TauonMusicPlayer` in host) |
+| [Windows SMTC integration](windows-smtc-integration.md) | Exact-id adapter, onboarding HTTP, ForceUpdate reattach |
+| [Windows SMTC spike report](windows-smtc-spike-report.md) | UND-89 go/no-go evidence (harness only) |
 | [Playback policy](spotify-playback-policy-boundary.md) | Local control, not a soundtrack |
 | [Spotify constraints](spotify-constraints.md) | Why Spotify is not a product backend; agent do-nots |
 
@@ -20,11 +23,12 @@ Long-form documentation for UndefaultIt. The [repository README](../README.md) i
 | Document | What it covers |
 |----------|----------------|
 | [Backend architecture](backend-architecture.md) | Pipeline, HTTP API, config as implemented today |
-| [Quick launch](quick-launch.md) | Flags (`--quick`, `--mvp`, Spotify OAuth) on the current host |
+| [Quick launch](quick-launch.md) | Flags (`--quick`, `--mvp`) on the current host |
 | [CS2 GSI events](cs2-gsi-events.md) | Practical CS2 signal space vs current mapping |
 | [CS2 GSI simulator](cs2-simulator.md) | Local scenarios that post to `POST /gsi` |
 | [Continuous integration](ci.md) | GitHub Actions build/test |
 | [Release pipeline design](release-pipeline-design.md) | UND-31 packaging design; Spotify secret sections are obsolete |
+| [.NET TFM decision](dotnet-tfm-decision.md) | UND-30/46 research plus UND-92 Windows TFM note |
 
 ## Later (not Tauon MVP)
 
@@ -53,4 +57,5 @@ Superseded slices and long Spotify research: [archive/](archive/README.md).
 - **Host entry and routes:** `GsiHost/Program.cs`
 - **GSI processing:** `GsiHost/Services/GsiProcessingService.cs`
 - **Console bootstrap:** `GsiHost/Services/ConsoleLaunchBootstrap.cs`
-- **Per-area notes:** `GsiHost/Endpoints/README.md`, `GsiHost/Middleware/README.md`, `Core/Spotify/README.md`
+- **Onboarding page:** `GsiHost/wwwroot/index.html`
+- **Per-area notes:** `GsiHost/Endpoints/README.md`, `GsiHost/Middleware/README.md`

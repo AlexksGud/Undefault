@@ -5,10 +5,10 @@ alwaysApply: true
 
 # Product Boundaries
 
-- Describe Undefault as a game-aware music automation layer that controls an external player. It is not a synchronized soundtrack and it does not own the catalog.
-- First player backend: Tauon (remote HTTP). Spotify is dropped, not a product provider ([docs/spotify-constraints.md](docs/spotify-constraints.md)). Leftover Spotify code is deletion-only.
+- Describe Undefault as a local Windows event→action engine that controls the user's existing music player. It is not a synchronized soundtrack, CS2 companion, jukebox, or catalog owner.
+- Player backends: Tauon (remote HTTP, default), Mock for `--quick`, SMTC via exact `SourceAppUserModelId` when `Music:Provider=Smtc`. Spotify is dropped, not a product provider ([docs/spotify-constraints.md](docs/spotify-constraints.md)). Leftover Spotify config keys, if present, are deletion-only.
 - Keep CS2 as the first game, but avoid making shared Core/music contracts depend on CS2-only terms when a neutral concept exists.
-- Core must not contain Tauon- or Spotify-specific HTTP/OAuth. Provider details stay in adapters.
+- Core must not contain Tauon- or Spotify-specific HTTP/OAuth, or WinRT/SMTC types. Provider details stay in adapters.
 - Safety dominates adaptivity when that engine is live: `Danger` overrides scenario output, mixer/envelope gain, profile restore, and future automated behavior. The Tauon MVP does not wire live mixer side effects.
 - One orchestration entry applies playback changes per GSI evaluation tick.
 - Timeline / leftover observe-mode is tester tooling, not the product MVP.
@@ -19,10 +19,16 @@ Supersedes the UND-64 `intent_capture` observe+record slice as the **product** M
 
 - Default automation target: `round_start → resume`, `death → pause`.
 - Do not implement `round_end`, playlists, track-id playback, Dota music actions, or UI in that slice.
-- Current `main` implements that automation via `IMusicPlayer` / Tauon (Mock for `--quick`). Spotify OAuth is gone (UND-84); remaining mock observe leftovers are UND-101. Do not add a Spotify adapter.
+- Current `main` implements that automation via `IMusicPlayer` / Tauon (Mock for `--quick`, SMTC when selected). Spotify OAuth and the leftover observe client path are gone (UND-84, UND-101). Do not add a Spotify adapter.
 - Optional later: an external music import companion is design-only until approved (UND-86). Do not put a downloader in Core.
 
 Source: [docs/product-pivot-2026-08-14.md](docs/product-pivot-2026-08-14.md), [docs/roadmap.md](docs/roadmap.md).
+
+## Superseded (2026-09-01) — localhost onboarding page
+
+The 2026-08-14 bullet “Do not implement … or UI in that slice” is **knowingly superseded** (date 2026-09-01) by the localhost onboarding page ([UND-96](https://linear.app/undefault/issue/UND-96/local-onboarding-page-on-localhost-pick-a-session-test-it-choose)). `GsiHost` serves `wwwroot/index.html` at `GET /` (`UseDefaultFiles` + `UseStaticFiles`). That is local host UI for session pick, test pause/resume, and Flow/Focus. It is not a desktop app and not a CS2 companion surface.
+
+The rest of the 2026-08-14 slice still stands: no `round_end`, playlists, track-id playback, or Dota music actions. Focus remains a preset, not the product. Direction: [docs/smtc-onboarding-decision-2026-09-01.md](docs/smtc-onboarding-decision-2026-09-01.md).
 
 ## Historical (2026-06-28)
 
