@@ -19,9 +19,8 @@ public sealed class MusicProviderOptions
     /// Canonical name for the Windows SMTC adapter.
     /// </summary>
     /// <remarks>
-    /// The name is accepted by <see cref="MusicProviderResolver"/>. The adapter is not
-    /// registered in this host build; startup fails with a not-registered error instead
-    /// of falling back to Tauon.
+    /// Registered on the Windows TFM. The net8.0 shim still fails startup with a
+    /// not-registered error instead of falling back to Tauon.
     /// </remarks>
     public const string Smtc = "Smtc";
 

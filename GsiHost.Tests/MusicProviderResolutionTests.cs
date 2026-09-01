@@ -16,9 +16,9 @@ public sealed class MusicProviderResolutionTests
     [InlineData(" Tauon ", MusicProviderOptions.Tauon, true)]
     [InlineData("Mock", MusicProviderOptions.Mock, true)]
     [InlineData("mock", MusicProviderOptions.Mock, true)]
-    [InlineData("Smtc", MusicProviderOptions.Smtc, false)]
-    [InlineData("smtc", MusicProviderOptions.Smtc, false)]
-    [InlineData("SMTC", MusicProviderOptions.Smtc, false)]
+    [InlineData("Smtc", MusicProviderOptions.Smtc, true)]
+    [InlineData("smtc", MusicProviderOptions.Smtc, true)]
+    [InlineData("SMTC", MusicProviderOptions.Smtc, true)]
     public void Resolve_AcceptedValues_ReturnCanonicalName(
         string? configured,
         string canonicalName,
@@ -37,7 +37,7 @@ public sealed class MusicProviderResolutionTests
 
         resolved.CanonicalName.Should().Be(MusicProviderOptions.Smtc);
         resolved.CanonicalName.Should().NotBe(MusicProviderOptions.Tauon);
-        resolved.PlayerIsRegistered.Should().BeFalse();
+        resolved.PlayerIsRegistered.Should().BeTrue();
     }
 
     [Theory]
@@ -66,23 +66,23 @@ public sealed class MusicProviderResolutionTests
         var resolved = MusicProviderResolver.Resolve(configuration);
 
         resolved.CanonicalName.Should().Be(MusicProviderOptions.Smtc);
-        resolved.PlayerIsRegistered.Should().BeFalse();
+        resolved.PlayerIsRegistered.Should().BeTrue();
     }
 
     [Fact]
-    public void EnsurePlayerRegistered_Smtc_ThrowsNotRegistered()
+    public void EnsurePlayerRegistered_Smtc_DoesNotThrowOnWindowsTfm()
     {
         var resolved = MusicProviderResolver.Resolve("Smtc");
 
         var act = () => MusicProviderResolver.EnsurePlayerRegistered(resolved);
 
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("Music:Provider 'Smtc' is not registered.");
+        act.Should().NotThrow();
     }
 
     [Theory]
     [InlineData("Tauon")]
     [InlineData("Mock")]
+    [InlineData("Smtc")]
     public void EnsurePlayerRegistered_RegisteredProviders_DoNotThrow(string configured)
     {
         var resolved = MusicProviderResolver.Resolve(configured);

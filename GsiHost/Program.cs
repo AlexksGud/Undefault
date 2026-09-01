@@ -13,6 +13,9 @@ using GsiHost.Dtos;
 using GsiHost.Mapping;
 using GsiHost.Mapping.Modules;
 using GsiHost.Players;
+#if WINDOWS
+using GsiHost.Players.Smtc;
+#endif
 using GsiHost.Services;
 using Microsoft.Extensions.Options;
 
@@ -102,6 +105,8 @@ builder.Services.Configure<MusicProviderOptions>(
     builder.Configuration.GetSection(MusicProviderOptions.SectionName));
 builder.Services.Configure<TauonOptions>(
     builder.Configuration.GetSection(TauonOptions.SectionName));
+builder.Services.Configure<SmtcOptions>(
+    builder.Configuration.GetSection(SmtcOptions.SectionName));
 
 var app = builder.Build();
 app.Logger.LogInformation("Music provider: {Provider}", resolvedMusicProvider.CanonicalName);
@@ -278,6 +283,15 @@ void BuildMusicPlayer(WebApplicationBuilder webApplicationBuilder, string provid
         webApplicationBuilder.Services.AddSingleton<IMusicPlayer, TauonMusicPlayer>();
         return;
     }
+
+#if WINDOWS
+    if (string.Equals(provider, MusicProviderOptions.Smtc, StringComparison.OrdinalIgnoreCase))
+    {
+        webApplicationBuilder.Services.AddSingleton<ISmtcSessionSource, WindowsMediaControllerSessionSource>();
+        webApplicationBuilder.Services.AddSingleton<IMusicPlayer, SmtcMusicPlayer>();
+        return;
+    }
+#endif
 
     throw new InvalidOperationException(
         $"Music:Provider '{provider}' is not registered.");

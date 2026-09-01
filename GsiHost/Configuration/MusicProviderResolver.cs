@@ -9,7 +9,7 @@ namespace GsiHost.Configuration;
 /// <param name="PlayerIsRegistered">
 /// <see langword="true"/> when this host build can construct an <c>IMusicPlayer</c> for
 /// <paramref name="CanonicalName"/>; <see langword="false"/> when the name is valid but
-/// the adapter is not registered (currently <c>Smtc</c>).
+/// the adapter is not registered (currently <c>Smtc</c> on the net8.0 shim only).
 /// </param>
 public sealed record MusicProviderResolution(string CanonicalName, bool PlayerIsRegistered);
 
@@ -26,7 +26,10 @@ public static class MusicProviderResolver
     private static readonly HashSet<string> RegisteredPlayers = new(StringComparer.Ordinal)
     {
         MusicProviderOptions.Tauon,
-        MusicProviderOptions.Mock
+        MusicProviderOptions.Mock,
+#if WINDOWS
+        MusicProviderOptions.Smtc,
+#endif
     };
 
     /// <summary>
