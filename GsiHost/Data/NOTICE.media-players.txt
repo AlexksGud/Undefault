@@ -1,0 +1,6 @@
+players.win.json is a local snapshot of
+https://live.musicpresence.app/v3/players.win.json
+from https://github.com/music-presence/media-players (MIT).
+
+The host does not fetch that URL at runtime. See LICENSE.media-players.txt
+for the upstream copyright and permission notice.

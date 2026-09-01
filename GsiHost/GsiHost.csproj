@@ -29,4 +29,13 @@
     <Compile Remove="Players\Smtc\**\*.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Update="Data\players.win.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Update="Data\LICENSE.media-players.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Update="Data\NOTICE.media-players.txt" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="Data\players.win.json">
+      <LogicalName>GsiHost.Data.players.win.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>
