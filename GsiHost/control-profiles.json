@@ -1,9 +1,9 @@
 {
-  "ActiveProfileId": "console-default",
+  "ActiveProfileId": "flow",
   "Profiles": [
     {
-      "Id": "console-default",
-      "Name": "Console Default",
+      "Id": "flow",
+      "Name": "Flow",
       "Rules": [
         {
           "EventKey": "round_start",
@@ -12,6 +12,20 @@
         {
           "EventKey": "death",
           "Command": "pause"
+        }
+      ]
+    },
+    {
+      "Id": "focus",
+      "Name": "Focus",
+      "Rules": [
+        {
+          "EventKey": "round_start",
+          "Command": "pause"
+        },
+        {
+          "EventKey": "death",
+          "Command": "resume"
         }
       ]
     }

@@ -115,6 +115,38 @@ public class ProfileRoutingTests
     }
 
     [Fact]
+    public async Task MusicControlProfileAction_SwitchingActivePreset_ChangesCommands()
+    {
+        var profiles = CreateFlowAndFocusPresets();
+        var controlProfileService = new FakeControlProfileService(
+            new ConsoleControlProfilesConfig("flow", profiles));
+
+        var flowPlayer = new FakeMusicPlayer
+        {
+            Available = true,
+            State = new MusicPlaybackState(PlaybackStatus.Paused, Track: null, VolumePercent: 55)
+        };
+        await ExecuteRoundStartAndDeathAsync(flowPlayer, controlProfileService);
+
+        flowPlayer.PlayCalls.Should().Be(1);
+        flowPlayer.PauseCalls.Should().Be(1);
+        flowPlayer.ResumeCalls.Should().Be(0);
+
+        await controlProfileService.SaveAsync(new ConsoleControlProfilesConfig("focus", profiles));
+
+        var focusPlayer = new FakeMusicPlayer
+        {
+            Available = true,
+            State = new MusicPlaybackState(PlaybackStatus.Playing, Track: null, VolumePercent: 55)
+        };
+        await ExecuteRoundStartAndDeathAsync(focusPlayer, controlProfileService);
+
+        focusPlayer.PauseCalls.Should().Be(1);
+        focusPlayer.PlayCalls.Should().Be(1);
+        focusPlayer.ResumeCalls.Should().Be(0);
+    }
+
+    [Fact]
     public async Task MusicControlProfileAction_WhenPlayerUnavailable_DoesNotThrow()
     {
         var player = new FakeMusicPlayer { Available = false };
@@ -308,6 +340,46 @@ public class ProfileRoutingTests
         await act.Should().ThrowAsync<OperationCanceledException>();
         player.PlayCalls.Should().Be(0);
         player.ResumeCalls.Should().Be(0);
+    }
+
+    private static List<ConsoleControlProfile> CreateFlowAndFocusPresets()
+    {
+        return new List<ConsoleControlProfile>
+        {
+            new(
+                "flow",
+                "Flow",
+                new List<EventControlRule>
+                {
+                    new(EventKeys.RoundStart, MusicControlCommands.Resume),
+                    new(EventKeys.Death, MusicControlCommands.Pause)
+                }),
+            new(
+                "focus",
+                "Focus",
+                new List<EventControlRule>
+                {
+                    new(EventKeys.RoundStart, MusicControlCommands.Pause),
+                    new(EventKeys.Death, MusicControlCommands.Resume)
+                })
+        };
+    }
+
+    private static async Task ExecuteRoundStartAndDeathAsync(
+        FakeMusicPlayer player,
+        FakeControlProfileService controlProfileService)
+    {
+        var playback = new MusicPlaybackControlCoordinator(
+            player,
+            Options.Create(new VolumeDuckOptions()),
+            NullLogger<MusicPlaybackControlCoordinator>.Instance);
+        var action = new MusicControlProfileAction(
+            playback,
+            controlProfileService,
+            NullLogger<MusicControlProfileAction>.Instance);
+
+        await action.ExecuteAsync(NormalizedEvent.RoundStart(BuildSnapshot(DateTimeOffset.UtcNow, 100, isAlive: true)));
+        await action.ExecuteAsync(NormalizedEvent.Death(BuildSnapshot(DateTimeOffset.UtcNow.AddSeconds(1), 0, isAlive: false)));
     }
 
     private static GameSnapshot BuildSnapshot(
