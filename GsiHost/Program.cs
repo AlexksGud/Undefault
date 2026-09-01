@@ -131,8 +131,6 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapMusicOnboarding();
 
-app.MapGet("/", () => "UndefaultIt GSI Host");
-
 app.MapPost("/gsi", async (
     GsiPayloadDto payload,
     GsiProcessingService processor,
