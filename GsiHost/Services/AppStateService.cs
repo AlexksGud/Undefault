@@ -5,8 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Core.Models;
 using Core.Services;
-using Core.Spotify;
-using Microsoft.Extensions.Logging;
 
 namespace GsiHost.Services;
 
@@ -14,26 +12,20 @@ public sealed class AppStateService : IAppStateService, IDisposable
 {
     private const int MaxEvents = 200;
     private readonly object _lock = new();
-    private readonly ISpotifyClient _spotifyClient;
-    private readonly ILogger<AppStateService> _logger;
     private readonly GsiProcessingService _processor;
     private readonly SimpleSubject<StatusSnapshot> _statusSubject = new();
     private readonly SimpleSubject<NormalizedEvent> _eventSubject = new();
     private readonly List<NormalizedEvent> _recentEvents = new();
     private StatusSnapshot _current;
 
-    public AppStateService(GsiProcessingService processor, ISpotifyClient spotifyClient, ILogger<AppStateService> logger)
+    public AppStateService(GsiProcessingService processor)
     {
         _processor = processor;
-        _spotifyClient = spotifyClient;
-        _logger = logger;
         _current = new StatusSnapshot(
             GsiStatus: "Disconnected",
             LastSnapshotAt: null,
             Game: "Unknown",
-            LastEvent: null,
-            SpotifyStatus: "Disconnected",
-            PlaybackState: "Stopped"
+            LastEvent: null
         );
 
         _processor.Processed += OnProcessed;
@@ -85,46 +77,13 @@ public sealed class AppStateService : IAppStateService, IDisposable
             }
         }
 
-        _ = UpdateAsync(args);
-    }
-
-    private async Task UpdateAsync(GsiProcessedEventArgs args)
-    {
         var snapshot = args.Snapshot;
         var lastEvent = args.Events.LastOrDefault();
-        var gsiStatus = "Connected";
-        var game = snapshot.GameId ?? "Unknown";
-
-        string spotifyStatus;
-        string playbackState;
-
-        try
-        {
-            spotifyStatus = await _spotifyClient.IsAuthenticatedAsync().ConfigureAwait(false)
-                ? "Connected"
-                : "Disconnected";
-
-            var playback = await _spotifyClient.GetCurrentPlaybackAsync().ConfigureAwait(false);
-            playbackState = playback is null
-                ? "Stopped"
-                : playback.IsPlaying
-                    ? "Playing"
-                    : "Paused";
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to get Spotify status.");
-            spotifyStatus = "Unknown";
-            playbackState = "Unknown";
-        }
-
         var status = new StatusSnapshot(
-            GsiStatus: gsiStatus,
+            GsiStatus: "Connected",
             LastSnapshotAt: snapshot.Timestamp,
-            Game: game,
-            LastEvent: lastEvent,
-            SpotifyStatus: spotifyStatus,
-            PlaybackState: playbackState
+            Game: snapshot.GameId ?? "Unknown",
+            LastEvent: lastEvent
         );
 
         lock (_lock)

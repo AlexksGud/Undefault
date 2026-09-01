@@ -1,12 +1,10 @@
 using Core.Actions;
-using Core.Actions.Spotify;
 using Core.Configuration;
 using Core.Diff;
 using Core.Models;
 using Core.Music;
 using Core.Rules;
 using Core.Services;
-using Core.Spotify;
 using Core.Stores;
 using Core.Adapters;
 using GsiHost.Adapters;
@@ -45,12 +43,12 @@ builder.Services.AddSingleton<EventDetector>(sp =>
 builder.Services.AddSingleton<ISnapshotStore, InMemorySnapshotStore>();
 builder.Services.AddSingleton<IEventAction, LogEventAction>();
 builder.Services.AddSingleton<IEventAction, MusicControlProfileAction>();
-builder.Services.AddSingleton<IEventAction, SpotifyControlProfileAction>();
-builder.Services.AddSingleton<IEventAction, SpotifyProfileAction>();
-builder.Services.AddSingleton<IEventAction, SpotifyVolumeDuckAction>();
-builder.Services.AddSingleton<IPlaybackPolicy, NoOpPlaybackPolicy>();
-builder.Services.AddSingleton<ISmartTrackStartService, JsonSmartTrackStartService>();
-builder.Services.AddSingleton<ITrackPlaybackService, TrackPlaybackService>();
+builder.Services.AddSingleton<IEventAction>(sp =>
+    new MusicControlProfileAction(
+        sp.GetRequiredService<IMusicPlaybackControl>(),
+        sp.GetRequiredService<IControlProfileService>(),
+        sp.GetRequiredService<ILogger<MusicControlProfileAction>>(),
+        MusicControlProfileAction.LegacySpotifyKey));
 builder.Services.AddSingleton<IRulesEngine, RulesEngine>();
 builder.Services.AddSingleton<IMusicOrchestrationFacade, ShadowMusicOrchestrationFacade>();
 builder.Services.AddSingleton<IShadowMusicSnapshotSink, InMemoryShadowMusicSnapshotSink>();
@@ -78,13 +76,7 @@ builder.Services.AddSingleton<ISnapshotModuleMapper, CombatModuleMapper>();
 builder.Services.AddSingleton<ISnapshotModuleMapper, RoundModuleMapper>();
 
 BuildMusicPlayer(builder);
-builder.Services.AddSingleton<ISpotifyClient, MockSpotifyClient>();
-
-builder.Services.AddSingleton<SpotifyPlaybackControlCoordinator>();
-builder.Services.AddSingleton<IMusicPlaybackControl>(sp =>
-    sp.GetRequiredService<SpotifyPlaybackControlCoordinator>());
-builder.Services.AddSingleton<ISpotifyPlaybackControl>(sp =>
-    sp.GetRequiredService<SpotifyPlaybackControlCoordinator>());
+builder.Services.AddSingleton<IMusicPlaybackControl, MusicPlaybackControlCoordinator>();
 
 builder.Services.Configure<RulesEngineOptions>(
     builder.Configuration.GetSection("RulesEngine"));
@@ -92,8 +84,6 @@ builder.Services.Configure<EventDetectorOptions>(
     builder.Configuration.GetSection("EventDetector"));
 builder.Services.Configure<VolumeDuckOptions>(
     builder.Configuration.GetSection("SpotifyVolumeDuck"));
-builder.Services.Configure<SmartTrackStartOptions>(
-    builder.Configuration.GetSection("SmartTrackStart"));
 builder.Services.Configure<GsiOptions>(
     builder.Configuration.GetSection(GsiOptions.SectionName));
 builder.Services.Configure<RuntimeOptions>(
@@ -123,11 +113,6 @@ if (!string.Equals(resolvedMusicProvider, "Tauon", StringComparison.OrdinalIgnor
 if (!consoleLaunchSettings.SkipCs2Setup)
 {
     await EnsureCs2SetupAsync(app);
-}
-
-if (!consoleLaunchSettings.SkipSmartTrackWarmup)
-{
-    await WarmSmartTrackStartAsync(app);
 }
 
 await WriteConsoleStartupChecklistAsync(app, consoleLaunchSettings);
@@ -178,7 +163,7 @@ app.MapGet("/status", async (
     }
     catch (Exception)
     {
-        // Fail-soft: GSI fields still return. PlaybackState is leftover Spotify until this overlay.
+        // Fail-soft: GSI fields still return when the player cannot be read.
     }
 
     return Results.Ok(new
@@ -187,7 +172,6 @@ app.MapGet("/status", async (
         status.LastSnapshotAt,
         status.Game,
         status.LastEvent,
-        leftoverSpotifyStatus = status.SpotifyStatus,
         musicProvider = configuration["Music:Provider"] ?? "Tauon",
         musicPlayerAvailable = musicState is not null,
         playbackState = musicState?.Status.ToString() ?? "Unavailable",
@@ -203,32 +187,6 @@ if (resolvedRuntime.IsIntentCapture)
 
     app.MapGet("/timeline/episodes", (TimelineCaptureService timeline) => Results.Ok((object?)timeline.GetIntentEpisodes()));
 }
-
-// UND-84: leftover surface. The OAuth layer is deleted, so ISpotifyClient is always the
-// mock and the credential/token fields are constants kept only for response-shape
-// compatibility until this endpoint is removed with the rest of the leftover.
-app.MapGet("/spotify/status", async (ISpotifyClient spotifyClient, CancellationToken cancellationToken) =>
-{
-    bool isAuthenticated;
-    try
-    {
-        isAuthenticated = await spotifyClient.IsAuthenticatedAsync(cancellationToken);
-    }
-    catch
-    {
-        isAuthenticated = false;
-    }
-
-    return Results.Ok(new
-    {
-        UseMockSpotify = true,
-        HasClientCredentials = false,
-        RedirectUri = (string?)null,
-        IsAuthenticated = isAuthenticated,
-        HasAccessToken = false,
-        ExpiresAt = (DateTimeOffset?)null
-    });
-});
 
 app.MapGet("/config", async (IConfigurationService configService, CancellationToken cancellationToken) =>
 {
@@ -350,27 +308,12 @@ static async Task EnsureCs2SetupAsync(WebApplication app)
     }
 }
 
-static async Task WarmSmartTrackStartAsync(WebApplication app)
-{
-    try
-    {
-        var smartTrackStartService = app.Services.GetRequiredService<ISmartTrackStartService>();
-        await smartTrackStartService.WarmAsync();
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogWarning(ex, "Failed to warm Smart Track Start metadata");
-    }
-}
-
 static async Task WriteConsoleStartupChecklistAsync(
     WebApplication app,
     ConsoleLaunchSettings consoleLaunchSettings)
 {
     var setupService = app.Services.GetRequiredService<ICs2SetupService>();
     var controlProfileService = app.Services.GetRequiredService<IControlProfileService>();
-    var smartTrackStartService = app.Services.GetRequiredService<ISmartTrackStartService>();
-    var spotifyClient = app.Services.GetRequiredService<ISpotifyClient>();
 
     Cs2SetupStatus? cs2Status = null;
     if (!consoleLaunchSettings.SkipCs2Setup)
@@ -401,26 +344,6 @@ static async Task WriteConsoleStartupChecklistAsync(
             string.Equals(profile.Id, controlProfiles.ActiveProfileId, StringComparison.OrdinalIgnoreCase))
             ?? controlProfiles.Profiles.FirstOrDefault();
 
-    SmartTrackStartOptions smartTrackStartOptions;
-    try
-    {
-        smartTrackStartOptions = app.Services.GetRequiredService<IOptions<SmartTrackStartOptions>>().Value;
-    }
-    catch
-    {
-        smartTrackStartOptions = new SmartTrackStartOptions();
-    }
-
-    var spotifyAuthenticated = false;
-    try
-    {
-        spotifyAuthenticated = await spotifyClient.IsAuthenticatedAsync();
-    }
-    catch
-    {
-        spotifyAuthenticated = false;
-    }
-
     Console.WriteLine();
     Console.WriteLine("UndefaultIt console startup");
     Console.WriteLine($"- Music provider: {app.Configuration["Music:Provider"] ?? "Tauon"}");
@@ -445,15 +368,9 @@ static async Task WriteConsoleStartupChecklistAsync(
             roundStartCommand,
             deathCommand);
     }
-    Console.WriteLine($"- Smart Track Start warmup: {(consoleLaunchSettings.SkipSmartTrackWarmup ? "skipped" : "attempted")}");
-    Console.WriteLine($"- Smart Track Start: {(smartTrackStartOptions.Enabled ? "enabled" : "disabled")}");
-    Console.WriteLine($"- Smart Track Start file: {smartTrackStartService.FilePath}");
-    Console.WriteLine($"- Spotify authenticated: {(spotifyAuthenticated ? "yes" : "no")}");
-    Console.WriteLine("- Spotify playback control requires Premium and an active playback device.");
     Console.WriteLine("- Edit control-profiles.json for pause/resume/duck behavior.");
-    Console.WriteLine("- Edit smart-track-starts.json to configure optional non-zero track starts for spotify.profile playback.");
-    Console.WriteLine("- Open /status for GSI + IMusicPlayer state. /spotify/status is leftover until PIVOT-10.");
-    Console.WriteLine("- Tauon smoke (PIVOT-9): default launch without --mvp; watch Tauon and Playback pause/resume logs, not leftover Spotify fields.");
+    Console.WriteLine("- Open /status for GSI + IMusicPlayer state.");
+    Console.WriteLine("- Tauon smoke (PIVOT-9): default launch without --mvp; watch Tauon and Playback pause/resume logs.");
     Console.WriteLine();
 }
 

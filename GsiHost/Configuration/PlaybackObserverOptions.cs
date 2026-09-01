@@ -2,13 +2,13 @@ namespace GsiHost.Configuration;
 
 /// <summary>
 /// Configuration for <see cref="GsiHost.Services.PlaybackStateObserver"/>, the background service
-/// that polls Spotify playback state and records pause/resume transitions to the timeline.
+/// that polls <c>IMusicPlayer</c> and records pause/resume transitions to the timeline.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The MVP observes Spotify playback state (via <c>GetCurrentPlaybackAsync</c> polling) instead of
-/// binding a global hotkey, because physical media play/pause keys cannot be registered with
-/// <c>RegisterHotKey</c> and Spotify controls that playback natively.
+/// Leftover <c>intent_capture</c> tooling observes player transport (via <c>GetStateAsync</c> polling)
+/// instead of binding a global hotkey, because physical media play/pause keys cannot be registered
+/// with <c>RegisterHotKey</c>.
 /// </para>
 /// <para>
 /// Recording is additionally gated on the <c>intent_capture</c> runtime: the hosted service is only

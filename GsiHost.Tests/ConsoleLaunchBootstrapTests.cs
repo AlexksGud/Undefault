@@ -1,8 +1,6 @@
 using FluentAssertions;
 using GsiHost.Services;
 using Microsoft.Extensions.Configuration;
-using Core.Spotify;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace GsiHost.Tests;
 
@@ -111,14 +109,6 @@ public sealed class ConsoleLaunchBootstrapTests
         settings.ConfigurationOverrides["Runtime:Mode"].Should().Be("intent_capture");
         settings.ConfigurationOverrides["PlaybackObserver:Enabled"].Should().Be("true");
         settings.ConfigurationOverrides["Music:Provider"].Should().Be("Tauon");
-    }
-
-    [Fact]
-    public async Task MockSpotifyClient_ReportsUnauthenticatedState()
-    {
-        var client = new MockSpotifyClient(NullLogger<MockSpotifyClient>.Instance);
-
-        (await client.IsAuthenticatedAsync()).Should().BeFalse();
     }
 
     private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)

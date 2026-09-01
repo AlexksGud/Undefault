@@ -90,12 +90,18 @@ public sealed class MockMusicPlayer : IMusicPlayer
         return Task.FromResult(Available);
     }
 
+    /// <summary>
+    /// Gets the number of <see cref="GetStateAsync"/> invocations.
+    /// </summary>
+    public int GetStateCalls { get; private set; }
+
     /// <inheritdoc />
     public Task<MusicPlaybackState?> GetStateAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_sync)
         {
+            GetStateCalls++;
             if (!_available)
             {
                 return Task.FromResult<MusicPlaybackState?>(null);
