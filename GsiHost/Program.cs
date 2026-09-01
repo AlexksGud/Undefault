@@ -10,6 +10,7 @@ using Core.Adapters;
 using GsiHost.Adapters;
 using GsiHost.Configuration;
 using GsiHost.Dtos;
+using GsiHost.Endpoints;
 using GsiHost.Mapping;
 using GsiHost.Mapping.Modules;
 using GsiHost.Players;
@@ -83,7 +84,15 @@ MusicProviderResolver.EnsurePlayerRegistered(resolvedMusicProvider);
 builder.Services.AddSingleton(resolvedMusicProvider);
 
 BuildMusicPlayer(builder, resolvedMusicProvider.CanonicalName);
-builder.Services.AddSingleton<IMusicPlaybackControl, MusicPlaybackControlCoordinator>();
+builder.Services.AddSingleton<MediaPlayerDisplayNameCatalog>();
+builder.Services.AddSingleton<MusicLastCommandStore>();
+builder.Services.AddSingleton<MusicOnboardingService>();
+builder.Services.AddSingleton<MusicPlaybackControlCoordinator>();
+builder.Services.AddSingleton<IMusicPlaybackControl>(sp =>
+    new RecordingMusicPlaybackControl(
+        sp.GetRequiredService<MusicPlaybackControlCoordinator>(),
+        sp.GetRequiredService<MusicLastCommandStore>(),
+        sp.GetRequiredService<IOptions<SmtcOptions>>()));
 
 builder.Services.Configure<RulesEngineOptions>(
     builder.Configuration.GetSection("RulesEngine"));
@@ -117,6 +126,9 @@ if (!consoleLaunchSettings.SkipCs2Setup)
 }
 
 await WriteConsoleStartupChecklistAsync(app, consoleLaunchSettings);
+
+app.UseStaticFiles();
+app.MapMusicOnboarding();
 
 app.MapGet("/", () => "UndefaultIt GSI Host");
 
