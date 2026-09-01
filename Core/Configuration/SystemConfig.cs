@@ -2,8 +2,7 @@ namespace Core.Configuration;
 
 public sealed record SystemConfig(
     SpotifySystemConfig Spotify,
-    GsiConfig Gsi,
-    bool UseMockSpotify
+    GsiConfig Gsi
 );
 
 // PKCE flow (UND-47) does not use a client_secret. The shape intentionally omits it so

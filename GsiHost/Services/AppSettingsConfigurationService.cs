@@ -34,10 +34,9 @@ public sealed class AppSettingsConfigurationService : IConfigurationService
         {
             var root = await ReadRootAsync(cancellationToken);
             var spotify = ParseSpotify(root);
-            var useMockSpotify = root["UseMockSpotify"]?.GetValue<bool>() ?? false;
             var gsi = ParseGsi(root, _configuration);
 
-            return new SystemConfig(spotify, gsi, useMockSpotify);
+            return new SystemConfig(spotify, gsi);
         }
         finally
         {
@@ -56,7 +55,7 @@ public sealed class AppSettingsConfigurationService : IConfigurationService
         try
         {
             var root = await ReadRootAsync(cancellationToken);
-            root["UseMockSpotify"] = config.UseMockSpotify;
+            root.Remove("UseMockSpotify");
 
             var spotifyNode = root["Spotify"] as JsonObject ?? new JsonObject();
             spotifyNode["ClientId"] = config.Spotify.ClientId;

@@ -76,7 +76,7 @@ Control commands stay in `MusicControlCommands`: existing `pause` / `resume` / `
 
 Providers: `Tauon` (default) | `Mock`.
 
-`--quick` should select the mock **player**, not “mock Spotify”. Keep `--use-mock-spotify` as a compatibility alias during migration.
+`--quick` selects the mock player (`Music:Provider=Mock`). There is no `--use-mock-spotify` alias; set `Music:Provider=Mock` without `--quick` if you need the mock while keeping CS2 setup.
 
 Default bind for Tauon is loopback `127.0.0.1`. Do not default to `0.0.0.0`. Tauon's own process may listen on all interfaces; Undefault should still call loopback. See [tauon-integration.md](tauon-integration.md).
 

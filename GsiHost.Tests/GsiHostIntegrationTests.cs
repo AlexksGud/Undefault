@@ -131,6 +131,28 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     }
 
     [Fact]
+    public async Task SpotifyStatusEndpoint_IsNotMapped()
+    {
+        using var host = CreateTestHost();
+
+        var response = await host.Client.GetAsync("/spotify/status");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task ConfigEndpoint_DoesNotExposeUseMockSpotify()
+    {
+        using var host = CreateTestHost();
+
+        var response = await host.Client.GetAsync("/config");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        doc.RootElement.TryGetProperty("useMockSpotify", out _).Should().BeFalse();
+        doc.RootElement.TryGetProperty("UseMockSpotify", out _).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ProfilesEndpoint_RoundTripsNewSchema()
     {
         using var host = CreateTestHost();
@@ -1108,7 +1130,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
             "Url": "{{gsiBaseUrl}}",
             "AllowReset": {{(allowGsiReset ? "true" : "false")}}
           },
-          "UseMockSpotify": true,
           "Music": {
             "Provider": "{{musicProvider}}"
           },

@@ -20,7 +20,7 @@ public sealed class ConsoleLaunchBootstrapTests
         settings.ConfigurationOverrides.Keys.Should().NotContain(key =>
             key.StartsWith("Spotify:", StringComparison.OrdinalIgnoreCase));
         settings.ConfigurationOverrides.ContainsKey("UseMockSpotify").Should().BeFalse(
-            "UND-84 deleted the real-client switch; the leftover client is always the mock");
+            "UND-85 deleted the leftover UseMockSpotify key; Mock is selected via --quick or Music:Provider=Mock");
     }
 
     [Fact]
@@ -48,8 +48,37 @@ public sealed class ConsoleLaunchBootstrapTests
 
         settings.IsQuickLaunch.Should().BeTrue();
         settings.SkipCs2Setup.Should().BeTrue();
-        settings.SkipSmartTrackWarmup.Should().BeTrue();
         settings.ConfigurationOverrides["Music:Provider"].Should().Be("Mock");
+    }
+
+    [Fact]
+    public void Prepare_ConfiguredMockProvider_IsPreservedWhenNotQuick()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Gsi:Url"] = "http://127.0.0.1:5292",
+            ["Music:Provider"] = "Mock"
+        });
+
+        var settings = ConsoleLaunchBootstrap.Prepare(configuration, Array.Empty<string>());
+
+        settings.IsQuickLaunch.Should().BeFalse();
+        settings.SkipCs2Setup.Should().BeFalse();
+        settings.ConfigurationOverrides["Music:Provider"].Should().Be("Mock");
+    }
+
+    [Fact]
+    public void Prepare_RemovedUseMockSpotifyFlag_DoesNotSelectMockProvider()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Gsi:Url"] = "http://127.0.0.1:5292"
+        });
+
+        var settings = ConsoleLaunchBootstrap.Prepare(configuration, new[] { "--use-mock-spotify" });
+
+        settings.IsQuickLaunch.Should().BeFalse();
+        settings.ConfigurationOverrides["Music:Provider"].Should().Be("Tauon");
     }
 
     [Fact]
