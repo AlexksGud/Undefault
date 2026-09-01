@@ -8,6 +8,10 @@ namespace Core.Music;
 /// <summary>
 /// Applies idempotent pause/resume/skip and duck/restore session state through <see cref="IMusicPlayer"/>.
 /// </summary>
+/// <remarks>
+/// Reads the adapter's static <see cref="MusicPlayerCapabilities"/> ceiling before transport calls
+/// and before any duck-state mutation. Per-session control availability stays the adapter's job.
+/// </remarks>
 public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
 {
     private readonly IMusicPlayer _player;
@@ -60,6 +64,12 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
             "pause",
             async () =>
             {
+                if (GateCapability(_player.Capabilities.CanPause, "pause", nameof(MusicPlayerCapabilities.CanPause))
+                    is { } blocked)
+                {
+                    return blocked;
+                }
+
                 var state = await GetAvailableStateAsync(eventKeyForLog, "pause", cancellationToken)
                     .ConfigureAwait(false);
                 if (state is null)
@@ -94,6 +104,12 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
             "resume",
             async () =>
             {
+                if (GateCapability(_player.Capabilities.CanResume, "resume", nameof(MusicPlayerCapabilities.CanResume))
+                    is { } blocked)
+                {
+                    return blocked;
+                }
+
                 var state = await GetAvailableStateAsync(eventKeyForLog, "resume", cancellationToken)
                     .ConfigureAwait(false);
                 if (state is null)
@@ -128,6 +144,12 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
             "next",
             async () =>
             {
+                if (GateCapability(_player.Capabilities.CanSkip, "next", nameof(MusicPlayerCapabilities.CanSkip))
+                    is { } blocked)
+                {
+                    return blocked;
+                }
+
                 if (!await EnsureAvailableAsync(eventKeyForLog, cancellationToken).ConfigureAwait(false))
                 {
                     return Unavailable(eventKeyForLog, "next");
@@ -151,6 +173,12 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
             "previous",
             async () =>
             {
+                if (GateCapability(_player.Capabilities.CanSkip, "previous", nameof(MusicPlayerCapabilities.CanSkip))
+                    is { } blocked)
+                {
+                    return blocked;
+                }
+
                 if (!await EnsureAvailableAsync(eventKeyForLog, cancellationToken).ConfigureAwait(false))
                 {
                     return Unavailable(eventKeyForLog, "previous");
@@ -193,6 +221,14 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
             "restore_volume",
             async () =>
             {
+                if (GateCapability(
+                        _player.Capabilities.CanSetVolume,
+                        "restore_volume",
+                        nameof(MusicPlayerCapabilities.CanSetVolume)) is { } blocked)
+                {
+                    return blocked;
+                }
+
                 if (!await EnsureAvailableAsync(eventKeyForLog, cancellationToken).ConfigureAwait(false))
                 {
                     return Unavailable(eventKeyForLog, "restore_volume");
@@ -244,6 +280,14 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
             "managed volume",
             async () =>
             {
+                if (GateCapability(
+                        _player.Capabilities.CanSetVolume,
+                        "managed volume",
+                        nameof(MusicPlayerCapabilities.CanSetVolume)) is { } blocked)
+                {
+                    return blocked;
+                }
+
                 var state = await GetAvailableStateAsync(eventKeyForLog, "managed volume", cancellationToken)
                     .ConfigureAwait(false);
                 if (state is null)
@@ -287,6 +331,14 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
             "duck",
             async () =>
             {
+                if (GateCapability(
+                        _player.Capabilities.CanSetVolume,
+                        "duck",
+                        nameof(MusicPlayerCapabilities.CanSetVolume)) is { } blocked)
+                {
+                    return blocked;
+                }
+
                 var state = await GetAvailableStateAsync(eventKeyForLog, "duck", cancellationToken)
                     .ConfigureAwait(false);
                 if (state is null)
@@ -349,6 +401,21 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
             eventKeyForLog ?? "(scenario)",
             operation);
         return null;
+    }
+
+    private MusicCommandResult? GateCapability(bool supported, string operation, string capabilityName)
+    {
+        if (supported)
+        {
+            return null;
+        }
+
+        _logger.LogDebug(
+            "Playback {Operation} is unsupported because {Capability} is false.",
+            operation,
+            capabilityName);
+        return MusicCommandResult.Unsupported(
+            $"Playback {operation} is unsupported because {capabilityName} is false.");
     }
 
     private static MusicCommandResult Unavailable(string? eventKeyForLog, string operation)

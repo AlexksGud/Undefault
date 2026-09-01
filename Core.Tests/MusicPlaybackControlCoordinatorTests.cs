@@ -7,10 +7,11 @@ using Microsoft.Extensions.Options;
 namespace Core.Tests;
 
 /// <summary>
-/// Unit tests for <see cref="MusicPlaybackControlCoordinator"/> pause/resume/skip control behavior.
+/// Unit tests for <see cref="MusicPlaybackControlCoordinator"/> pause/resume/skip and duck control behavior.
 /// UND-77 moved pause/resume transition recording to <c>PlaybackStateObserver</c>; the coordinator no
-/// longer records, so these tests verify playback control (pause/resume applied once on a state change)
-/// and that unavailable/missing-state cases fail softly.
+/// longer records, so these tests verify playback control (pause/resume applied once on a state change),
+/// that unavailable/missing-state cases fail softly, and that static capability ceilings block commands
+/// before duck-state mutation.
 /// </summary>
 public class MusicPlaybackControlCoordinatorTests
 {
@@ -168,6 +169,154 @@ public class MusicPlaybackControlCoordinatorTests
     }
 
     [Fact]
+    public async Task DuckThenRestore_WhenVolumeSupported_LowersAndRestoresVolume()
+    {
+        var player = new FakeMusicPlayer
+        {
+            Available = true,
+            State = Playing()
+        };
+        var coordinator = BuildCoordinator(player);
+
+        var duck = await coordinator.TryDuckAsync(10, "custom:duck");
+        var restore = await coordinator.TryRestoreVolumeAsync("custom:restore");
+
+        duck.Should().Be(MusicCommandResult.Applied);
+        restore.Should().Be(MusicCommandResult.Applied);
+        player.VolumeCalls.Should().Equal(10, 70);
+    }
+
+    [Fact]
+    public async Task Duck_WhenVolumeUnsupported_ReturnsUnsupportedAndRestoreDoesNotWriteVolume()
+    {
+        var player = new FakeMusicPlayer
+        {
+            Available = true,
+            State = Playing(),
+            Capabilities = MusicPlayerCapabilities.Mvp with { CanSetVolume = false }
+        };
+        var coordinator = BuildCoordinator(player);
+
+        var duck = await coordinator.TryDuckAsync(10, "custom:duck");
+        var restore = await coordinator.TryRestoreVolumeAsync("custom:restore");
+
+        AssertNonApplied(duck, MusicCommandOutcome.Unsupported);
+        AssertNonApplied(restore, MusicCommandOutcome.Unsupported);
+        duck.Reason.Should().Contain(nameof(MusicPlayerCapabilities.CanSetVolume));
+        restore.Reason.Should().Contain(nameof(MusicPlayerCapabilities.CanSetVolume));
+        player.VolumeCalls.Should().BeEmpty();
+        player.GetStateCalls.Should().Be(0);
+        player.IsAvailableCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Duck_WhenVolumeUnsupported_DoesNotArmDuckState()
+    {
+        var player = new FakeMusicPlayer
+        {
+            Available = true,
+            State = Playing(),
+            Capabilities = MusicPlayerCapabilities.Mvp with { CanSetVolume = false }
+        };
+        var coordinator = BuildCoordinator(player);
+
+        var duck = await coordinator.TryDuckAsync(10, "custom:duck");
+        AssertNonApplied(duck, MusicCommandOutcome.Unsupported);
+        player.VolumeCalls.Should().BeEmpty();
+
+        player.Capabilities = MusicPlayerCapabilities.Mvp;
+        var restore = await coordinator.TryRestoreVolumeAsync("custom:restore");
+
+        restore.Should().Be(MusicCommandResult.Applied);
+        player.VolumeCalls.Should().BeEmpty();
+        player.GetStateCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task SetManagedVolume_WhenVolumeUnsupported_DoesNotArmDuckState()
+    {
+        var player = new FakeMusicPlayer
+        {
+            Available = true,
+            State = Playing(),
+            Capabilities = MusicPlayerCapabilities.Mvp with { CanSetVolume = false }
+        };
+        var coordinator = BuildCoordinator(player);
+
+        var managed = await coordinator.TrySetManagedVolumeAsync(5, "custom:volume");
+        AssertNonApplied(managed, MusicCommandOutcome.Unsupported);
+        player.VolumeCalls.Should().BeEmpty();
+
+        player.Capabilities = MusicPlayerCapabilities.Mvp;
+        var restore = await coordinator.TryRestoreVolumeAsync("custom:restore");
+
+        restore.Should().Be(MusicCommandResult.Applied);
+        player.VolumeCalls.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Pause_WhenPauseUnsupported_DoesNotPause()
+    {
+        var player = new FakeMusicPlayer
+        {
+            Available = true,
+            State = Playing(),
+            Capabilities = MusicPlayerCapabilities.Mvp with { CanPause = false }
+        };
+        var coordinator = BuildCoordinator(player);
+
+        var result = await coordinator.TryPauseAsync("custom:music_pause");
+
+        AssertNonApplied(result, MusicCommandOutcome.Unsupported);
+        result.Reason.Should().Contain(nameof(MusicPlayerCapabilities.CanPause));
+        player.PauseCalls.Should().Be(0);
+        player.GetStateCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Resume_WhenResumeUnsupported_DoesNotResume()
+    {
+        var player = new FakeMusicPlayer
+        {
+            Available = true,
+            State = Paused(),
+            Capabilities = MusicPlayerCapabilities.Mvp with { CanResume = false }
+        };
+        var coordinator = BuildCoordinator(player);
+
+        var result = await coordinator.TryResumeAsync(EventKeys.RoundStart);
+
+        AssertNonApplied(result, MusicCommandOutcome.Unsupported);
+        result.Reason.Should().Contain(nameof(MusicPlayerCapabilities.CanResume));
+        player.PlayCalls.Should().Be(0);
+        player.ResumeCalls.Should().Be(0);
+        player.GetStateCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task NextAndPrevious_WhenSkipUnsupported_DoNotSkip()
+    {
+        var player = new FakeMusicPlayer
+        {
+            Available = true,
+            State = Playing(),
+            Capabilities = MusicPlayerCapabilities.Mvp with { CanSkip = false }
+        };
+        var coordinator = BuildCoordinator(player);
+
+        var next = await coordinator.TryNextAsync("custom:next");
+        var previous = await coordinator.TryPreviousAsync("custom:previous");
+
+        AssertNonApplied(next, MusicCommandOutcome.Unsupported);
+        AssertNonApplied(previous, MusicCommandOutcome.Unsupported);
+        next.Reason.Should().Contain(nameof(MusicPlayerCapabilities.CanSkip));
+        previous.Reason.Should().Contain(nameof(MusicPlayerCapabilities.CanSkip));
+        player.NextCalls.Should().Be(0);
+        player.PreviousCalls.Should().Be(0);
+        player.IsAvailableCalls.Should().Be(0);
+    }
+
+    [Fact]
     public async Task NullRecorder_DefaultsToNoOp_AndDoesNotThrow()
     {
         var player = new FakeMusicPlayer
@@ -229,7 +378,7 @@ internal sealed class FakeMusicPlayer : IMusicPlayer
     public int IsAvailableCalls { get; private set; }
     public List<int> VolumeCalls { get; } = new();
 
-    public MusicPlayerCapabilities Capabilities => MusicPlayerCapabilities.Mvp;
+    public MusicPlayerCapabilities Capabilities { get; set; } = MusicPlayerCapabilities.Mvp;
 
     public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
     {
