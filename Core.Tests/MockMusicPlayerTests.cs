@@ -11,17 +11,20 @@ public class MockMusicPlayerTests
     {
         var player = new MockMusicPlayer(NullLogger<MockMusicPlayer>.Instance);
 
-        await player.PlayAsync();
+        var play = await player.PlayAsync();
+        play.Should().Be(MusicCommandResult.Applied);
         var playing = await player.GetStateAsync();
         playing!.Status.Should().Be(PlaybackStatus.Playing);
         player.PlayCalls.Should().Be(1);
 
-        await player.PauseAsync();
+        var pause = await player.PauseAsync();
+        pause.Should().Be(MusicCommandResult.Applied);
         var paused = await player.GetStateAsync();
         paused!.Status.Should().Be(PlaybackStatus.Paused);
         player.PauseCalls.Should().Be(1);
 
-        await player.ResumeAsync();
+        var resume = await player.ResumeAsync();
+        resume.Should().Be(MusicCommandResult.Applied);
         var resumed = await player.GetStateAsync();
         resumed!.Status.Should().Be(PlaybackStatus.Playing);
         player.ResumeCalls.Should().Be(1);
@@ -33,9 +36,11 @@ public class MockMusicPlayerTests
         var player = new MockMusicPlayer(NullLogger<MockMusicPlayer>.Instance);
         player.SeedState(PlaybackStatus.Playing);
 
-        await player.ResumeAsync();
-        await player.ResumeAsync();
+        var first = await player.ResumeAsync();
+        var second = await player.ResumeAsync();
 
+        first.Should().Be(MusicCommandResult.Applied);
+        second.Should().Be(MusicCommandResult.Applied);
         var state = await player.GetStateAsync();
         state!.Status.Should().Be(PlaybackStatus.Playing);
         player.ResumeCalls.Should().Be(2);
@@ -51,7 +56,9 @@ public class MockMusicPlayerTests
         (await player.IsAvailableAsync()).Should().BeFalse();
         (await player.GetStateAsync()).Should().BeNull();
 
-        await player.PauseAsync();
+        var pause = await player.PauseAsync();
+        pause.Outcome.Should().Be(MusicCommandOutcome.Unavailable);
+        pause.Reason.Should().NotBeNullOrWhiteSpace();
         player.Available = true;
         var state = await player.GetStateAsync();
         state!.Status.Should().Be(PlaybackStatus.Playing);
@@ -62,10 +69,13 @@ public class MockMusicPlayerTests
     {
         var player = new MockMusicPlayer(NullLogger<MockMusicPlayer>.Instance);
 
-        await player.NextAsync();
-        await player.PreviousAsync();
-        await player.SetVolumeAsync(25);
+        var next = await player.NextAsync();
+        var previous = await player.PreviousAsync();
+        var volume = await player.SetVolumeAsync(25);
 
+        next.Should().Be(MusicCommandResult.Applied);
+        previous.Should().Be(MusicCommandResult.Applied);
+        volume.Should().Be(MusicCommandResult.Applied);
         player.NextCalls.Should().Be(1);
         player.PreviousCalls.Should().Be(1);
         player.VolumeCalls.Should().Equal(25);

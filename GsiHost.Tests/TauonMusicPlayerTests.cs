@@ -16,8 +16,9 @@ public sealed class TauonMusicPlayerTests
     {
         var (player, handler, _) = CreatePlayer(OkResponder());
 
-        await player.PlayAsync();
+        var result = await player.PlayAsync();
 
+        result.Should().Be(MusicCommandResult.Applied);
         AssertSingleGet(handler, $"{BaseUri}api1/play");
     }
 
@@ -26,8 +27,9 @@ public sealed class TauonMusicPlayerTests
     {
         var (player, handler, _) = CreatePlayer(OkResponder());
 
-        await player.PauseAsync();
+        var result = await player.PauseAsync();
 
+        result.Should().Be(MusicCommandResult.Applied);
         AssertSingleGet(handler, $"{BaseUri}api1/pause");
     }
 
@@ -38,8 +40,9 @@ public sealed class TauonMusicPlayerTests
     {
         var (player, handler, _) = CreatePlayer(StatusThenOk(StatusJson(status)));
 
-        await player.ResumeAsync();
+        var result = await player.ResumeAsync();
 
+        result.Should().Be(MusicCommandResult.Applied);
         handler.Requests.Should().HaveCount(2);
         AssertGet(handler.Requests[0], $"{BaseUri}api1/status");
         AssertGet(handler.Requests[1], $"{BaseUri}api1/play");
@@ -50,8 +53,9 @@ public sealed class TauonMusicPlayerTests
     {
         var (player, handler, _) = CreatePlayer(StatusThenOk(StatusJson("playing")));
 
-        await player.ResumeAsync();
+        var result = await player.ResumeAsync();
 
+        result.Should().Be(MusicCommandResult.Applied);
         AssertSingleGet(handler, $"{BaseUri}api1/status");
     }
 
@@ -60,8 +64,9 @@ public sealed class TauonMusicPlayerTests
     {
         var (player, handler, _) = CreatePlayer(OkResponder());
 
-        await player.NextAsync();
+        var result = await player.NextAsync();
 
+        result.Should().Be(MusicCommandResult.Applied);
         AssertSingleGet(handler, $"{BaseUri}api1/next");
     }
 
@@ -70,8 +75,9 @@ public sealed class TauonMusicPlayerTests
     {
         var (player, handler, _) = CreatePlayer(OkResponder());
 
-        await player.PreviousAsync();
+        var result = await player.PreviousAsync();
 
+        result.Should().Be(MusicCommandResult.Applied);
         AssertSingleGet(handler, $"{BaseUri}api1/back");
     }
 
@@ -130,11 +136,11 @@ public sealed class TauonMusicPlayerTests
 
         var available = await player.IsAvailableAsync();
         var state = await player.GetStateAsync();
-        var play = async () => await player.PlayAsync();
+        var play = await player.PlayAsync();
 
         available.Should().BeFalse();
         state.Should().BeNull();
-        await play.Should().NotThrowAsync();
+        AssertNonApplied(play, MusicCommandOutcome.Failed);
     }
 
     [Fact]
@@ -144,11 +150,11 @@ public sealed class TauonMusicPlayerTests
 
         var available = await player.IsAvailableAsync();
         var state = await player.GetStateAsync();
-        var play = async () => await player.PlayAsync();
+        var play = await player.PlayAsync();
 
         available.Should().BeFalse();
         state.Should().BeNull();
-        await play.Should().NotThrowAsync();
+        AssertNonApplied(play, MusicCommandOutcome.Unavailable);
     }
 
     [Fact]
@@ -158,6 +164,7 @@ public sealed class TauonMusicPlayerTests
 
         (await player.IsAvailableAsync()).Should().BeFalse();
         (await player.GetStateAsync()).Should().BeNull();
+        AssertNonApplied(await player.PlayAsync(), MusicCommandOutcome.Unsupported);
     }
 
     [Fact]
@@ -167,6 +174,7 @@ public sealed class TauonMusicPlayerTests
 
         (await player.IsAvailableAsync()).Should().BeFalse();
         (await player.GetStateAsync()).Should().BeNull();
+        AssertNonApplied(await player.PlayAsync(), MusicCommandOutcome.Rejected);
     }
 
     [Fact]
@@ -185,8 +193,9 @@ public sealed class TauonMusicPlayerTests
     {
         var (player, handler, _) = CreatePlayer(OkResponder());
 
-        await player.SetVolumeAsync(volume);
+        var result = await player.SetVolumeAsync(volume);
 
+        result.Should().Be(MusicCommandResult.Applied);
         AssertSingleGet(handler, $"{BaseUri}api1/setvolume/{volume}");
     }
 
@@ -276,6 +285,12 @@ public sealed class TauonMusicPlayerTests
         request.Method.Should().Be(HttpMethod.Get);
         request.Uri.Should().NotBeNull();
         request.Uri!.AbsoluteUri.Should().Be(absoluteUri);
+    }
+
+    private static void AssertNonApplied(MusicCommandResult result, MusicCommandOutcome outcome)
+    {
+        result.Outcome.Should().Be(outcome);
+        result.Reason.Should().NotBeNullOrWhiteSpace();
     }
 
     private sealed class CountingHttpClientFactory : IHttpClientFactory

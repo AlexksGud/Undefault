@@ -28,42 +28,42 @@ public interface IMusicPlayer
     /// Starts playback.
     /// </summary>
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    Task PlayAsync(CancellationToken cancellationToken = default);
+    /// <returns>The command result. Implementations must not throw for ordinary player or transport failures.</returns>
+    Task<MusicCommandResult> PlayAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Pauses playback.
     /// </summary>
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    Task PauseAsync(CancellationToken cancellationToken = default);
+    /// <returns>The command result. An already-paused player is not <see cref="MusicCommandOutcome.Failed"/>.</returns>
+    Task<MusicCommandResult> PauseAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Resumes playback. Implementations must be idempotent when already playing.
     /// </summary>
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    Task ResumeAsync(CancellationToken cancellationToken = default);
+    /// <returns>The command result. An already-playing player is not <see cref="MusicCommandOutcome.Failed"/>.</returns>
+    Task<MusicCommandResult> ResumeAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Skips to the next track.
     /// </summary>
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    Task NextAsync(CancellationToken cancellationToken = default);
+    /// <returns>The command result.</returns>
+    Task<MusicCommandResult> NextAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Skips to the previous track.
     /// </summary>
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    Task PreviousAsync(CancellationToken cancellationToken = default);
+    /// <returns>The command result.</returns>
+    Task<MusicCommandResult> PreviousAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Sets playback volume.
     /// </summary>
     /// <param name="volumePercent">The target volume in the range 0–100.</param>
     /// <param name="cancellationToken">The token to monitor for cancellation requests.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    Task SetVolumeAsync(int volumePercent, CancellationToken cancellationToken = default);
+    /// <returns>The command result.</returns>
+    Task<MusicCommandResult> SetVolumeAsync(int volumePercent, CancellationToken cancellationToken = default);
 }

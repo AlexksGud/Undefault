@@ -53,7 +53,7 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
     }
 
     /// <inheritdoc />
-    public Task TryPauseAsync(string? eventKeyForLog, CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> TryPauseAsync(string? eventKeyForLog, CancellationToken cancellationToken = default)
     {
         return ExecuteSafelyAsync(
             eventKeyForLog,
@@ -64,7 +64,7 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
                     .ConfigureAwait(false);
                 if (state is null)
                 {
-                    return;
+                    return Unavailable(eventKeyForLog, "pause");
                 }
 
                 if (state.Status != PlaybackStatus.Playing)
@@ -73,16 +73,21 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
                         "Event {EventKey} matched pause, but the player is already {Status}.",
                         eventKeyForLog ?? "(scenario)",
                         state.Status);
-                    return;
+                    return MusicCommandResult.Applied;
                 }
 
-                await _player.PauseAsync(cancellationToken).ConfigureAwait(false);
-                _logger.LogInformation("Playback pause for {EventKey}", eventKeyForLog ?? "(scenario)");
+                var result = await _player.PauseAsync(cancellationToken).ConfigureAwait(false);
+                if (result.IsApplied)
+                {
+                    _logger.LogInformation("Playback pause for {EventKey}", eventKeyForLog ?? "(scenario)");
+                }
+
+                return result;
             });
     }
 
     /// <inheritdoc />
-    public Task TryResumeAsync(string? eventKeyForLog, CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> TryResumeAsync(string? eventKeyForLog, CancellationToken cancellationToken = default)
     {
         return ExecuteSafelyAsync(
             eventKeyForLog,
@@ -93,7 +98,7 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
                     .ConfigureAwait(false);
                 if (state is null)
                 {
-                    return;
+                    return Unavailable(eventKeyForLog, "resume");
                 }
 
                 if (state.Status == PlaybackStatus.Playing)
@@ -101,17 +106,22 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
                     _logger.LogDebug(
                         "Event {EventKey} matched resume, but the player is already playing.",
                         eventKeyForLog ?? "(scenario)");
-                    return;
+                    return MusicCommandResult.Applied;
                 }
 
                 // PlayAsync, not ResumeAsync: the adapter resume path re-reads status.
-                await _player.PlayAsync(cancellationToken).ConfigureAwait(false);
-                _logger.LogInformation("Playback resume for {EventKey}", eventKeyForLog ?? "(scenario)");
+                var result = await _player.PlayAsync(cancellationToken).ConfigureAwait(false);
+                if (result.IsApplied)
+                {
+                    _logger.LogInformation("Playback resume for {EventKey}", eventKeyForLog ?? "(scenario)");
+                }
+
+                return result;
             });
     }
 
     /// <inheritdoc />
-    public Task TryNextAsync(string? eventKeyForLog, CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> TryNextAsync(string? eventKeyForLog, CancellationToken cancellationToken = default)
     {
         return ExecuteSafelyAsync(
             eventKeyForLog,
@@ -120,16 +130,21 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
             {
                 if (!await EnsureAvailableAsync(eventKeyForLog, cancellationToken).ConfigureAwait(false))
                 {
-                    return;
+                    return Unavailable(eventKeyForLog, "next");
                 }
 
-                await _player.NextAsync(cancellationToken).ConfigureAwait(false);
-                _logger.LogInformation("Playback next for {EventKey}", eventKeyForLog ?? "(scenario)");
+                var result = await _player.NextAsync(cancellationToken).ConfigureAwait(false);
+                if (result.IsApplied)
+                {
+                    _logger.LogInformation("Playback next for {EventKey}", eventKeyForLog ?? "(scenario)");
+                }
+
+                return result;
             });
     }
 
     /// <inheritdoc />
-    public Task TryPreviousAsync(string? eventKeyForLog, CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> TryPreviousAsync(string? eventKeyForLog, CancellationToken cancellationToken = default)
     {
         return ExecuteSafelyAsync(
             eventKeyForLog,
@@ -138,16 +153,21 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
             {
                 if (!await EnsureAvailableAsync(eventKeyForLog, cancellationToken).ConfigureAwait(false))
                 {
-                    return;
+                    return Unavailable(eventKeyForLog, "previous");
                 }
 
-                await _player.PreviousAsync(cancellationToken).ConfigureAwait(false);
-                _logger.LogInformation("Playback previous for {EventKey}", eventKeyForLog ?? "(scenario)");
+                var result = await _player.PreviousAsync(cancellationToken).ConfigureAwait(false);
+                if (result.IsApplied)
+                {
+                    _logger.LogInformation("Playback previous for {EventKey}", eventKeyForLog ?? "(scenario)");
+                }
+
+                return result;
             });
     }
 
     /// <inheritdoc />
-    public Task TryDuckAsync(
+    public Task<MusicCommandResult> TryDuckAsync(
         EventControlRule rule,
         NormalizedEvent context,
         CancellationToken cancellationToken = default)
@@ -157,7 +177,7 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
     }
 
     /// <inheritdoc />
-    public Task TryDuckAsync(
+    public Task<MusicCommandResult> TryDuckAsync(
         int volumePercent,
         string? eventKeyForLog,
         CancellationToken cancellationToken = default)
@@ -166,7 +186,7 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
     }
 
     /// <inheritdoc />
-    public Task TryRestoreVolumeAsync(string? eventKeyForLog, CancellationToken cancellationToken = default)
+    public Task<MusicCommandResult> TryRestoreVolumeAsync(string? eventKeyForLog, CancellationToken cancellationToken = default)
     {
         return ExecuteSafelyAsync(
             eventKeyForLog,
@@ -175,7 +195,7 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
             {
                 if (!await EnsureAvailableAsync(eventKeyForLog, cancellationToken).ConfigureAwait(false))
                 {
-                    return;
+                    return Unavailable(eventKeyForLog, "restore_volume");
                 }
 
                 int restoreVolume;
@@ -187,7 +207,7 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
                         _logger.LogDebug(
                             "Event {EventKey} matched restore_volume, but no managed duck state is active.",
                             eventKeyForLog ?? "(scenario)");
-                        return;
+                        return MusicCommandResult.Applied;
                     }
 
                     restoreVolume = _savedVolume ?? _duckOptions.FallbackRestoreVolume;
@@ -195,16 +215,21 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
                     _isDuckActive = false;
                 }
 
-                await _player.SetVolumeAsync(restoreVolume, cancellationToken).ConfigureAwait(false);
-                _logger.LogInformation(
-                    "Playback restore for {EventKey} -> volume={RestoreVolume}",
-                    eventKeyForLog ?? "(scenario)",
-                    restoreVolume);
+                var result = await _player.SetVolumeAsync(restoreVolume, cancellationToken).ConfigureAwait(false);
+                if (result.IsApplied)
+                {
+                    _logger.LogInformation(
+                        "Playback restore for {EventKey} -> volume={RestoreVolume}",
+                        eventKeyForLog ?? "(scenario)",
+                        restoreVolume);
+                }
+
+                return result;
             });
     }
 
     /// <inheritdoc />
-    public Task TrySetManagedVolumeAsync(
+    public Task<MusicCommandResult> TrySetManagedVolumeAsync(
         int volumePercent,
         string? eventKeyForLog,
         CancellationToken cancellationToken = default)
@@ -223,7 +248,7 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
                     .ConfigureAwait(false);
                 if (state is null)
                 {
-                    return;
+                    return Unavailable(eventKeyForLog, "managed volume");
                 }
 
                 var restoreVolume = state.VolumePercent ?? _duckOptions.FallbackRestoreVolume;
@@ -238,16 +263,21 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
                     _isDuckActive = true;
                 }
 
-                await _player.SetVolumeAsync(volumePercent, cancellationToken).ConfigureAwait(false);
-                _logger.LogDebug(
-                    "Managed volume for {EventKey} -> {Volume}% (saved restore={Saved})",
-                    eventKeyForLog ?? "(scenario)",
-                    volumePercent,
-                    restoreVolume);
+                var result = await _player.SetVolumeAsync(volumePercent, cancellationToken).ConfigureAwait(false);
+                if (result.IsApplied)
+                {
+                    _logger.LogDebug(
+                        "Managed volume for {EventKey} -> {Volume}% (saved restore={Saved})",
+                        eventKeyForLog ?? "(scenario)",
+                        volumePercent,
+                        restoreVolume);
+                }
+
+                return result;
             });
     }
 
-    private Task DuckInternalAsync(
+    private Task<MusicCommandResult> DuckInternalAsync(
         int targetVolume,
         string? eventKeyForLog,
         CancellationToken cancellationToken)
@@ -261,7 +291,7 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
                     .ConfigureAwait(false);
                 if (state is null)
                 {
-                    return;
+                    return Unavailable(eventKeyForLog, "duck");
                 }
 
                 var restoreVolume = state.VolumePercent ?? _duckOptions.FallbackRestoreVolume;
@@ -276,12 +306,17 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
                     _isDuckActive = true;
                 }
 
-                await _player.SetVolumeAsync(targetVolume, cancellationToken).ConfigureAwait(false);
-                _logger.LogInformation(
-                    "Playback duck for {EventKey} -> volume={TargetVolume} (saved={SavedVolume})",
-                    eventKeyForLog ?? "(scenario)",
-                    targetVolume,
-                    restoreVolume);
+                var result = await _player.SetVolumeAsync(targetVolume, cancellationToken).ConfigureAwait(false);
+                if (result.IsApplied)
+                {
+                    _logger.LogInformation(
+                        "Playback duck for {EventKey} -> volume={TargetVolume} (saved={SavedVolume})",
+                        eventKeyForLog ?? "(scenario)",
+                        targetVolume,
+                        restoreVolume);
+                }
+
+                return result;
             });
     }
 
@@ -316,11 +351,19 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
         return null;
     }
 
-    private async Task ExecuteSafelyAsync(string? eventKeyForLog, string operation, Func<Task> action)
+    private static MusicCommandResult Unavailable(string? eventKeyForLog, string operation)
+        => MusicCommandResult.Unavailable(
+            $"Music player is not available for {eventKeyForLog ?? "(scenario)"} ({operation}).");
+
+    private async Task<MusicCommandResult> ExecuteSafelyAsync(
+        string? eventKeyForLog,
+        string operation,
+        Func<Task<MusicCommandResult>> action)
     {
         try
         {
-            await action().ConfigureAwait(false);
+            var result = await action().ConfigureAwait(false);
+            return result.WithRequiredReason();
         }
         catch (OperationCanceledException)
         {
@@ -333,6 +376,7 @@ public class MusicPlaybackControlCoordinator : IMusicPlaybackControl
                 "Playback {Operation} failed for {EventKey}.",
                 operation,
                 eventKeyForLog ?? "(scenario)");
+            return MusicCommandResult.Failed($"Playback {operation} failed: {ex.Message}");
         }
     }
 }
