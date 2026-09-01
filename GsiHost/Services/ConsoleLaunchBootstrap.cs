@@ -7,7 +7,6 @@ public sealed record ConsoleLaunchSettings(
     bool IsQuickLaunch,
     bool IsMvpLaunch,
     bool SkipCs2Setup,
-    bool SkipSmartTrackWarmup,
     IReadOnlyDictionary<string, string?> ConfigurationOverrides
 );
 
@@ -16,8 +15,6 @@ public static class ConsoleLaunchBootstrap
     public const string DefaultGsiBaseUrl = "http://127.0.0.1:5292";
     private const string QuickLaunchArg = "--quick";
     private const string SkipCs2SetupArg = "--skip-cs2-setup";
-    private const string SkipSmartTrackWarmupArg = "--skip-smart-track-warmup";
-    private const string UseMockSpotifyArg = "--use-mock-spotify";
     private const string IntentCaptureArg = "--intent-capture";
     private const string ScenarioPlaybackArg = "--scenario-playback";
     private const string MvpArg = "--mvp";
@@ -40,18 +37,16 @@ public static class ConsoleLaunchBootstrap
 
         var gsiBaseUrl = NormalizeBaseUrl(configuration["Gsi:Url"]);
 
-        var requestedUseMockSpotify = HasArg(args, UseMockSpotifyArg);
         var requestedIntentCapture = HasArg(args, IntentCaptureArg);
         var requestedScenarioPlayback = HasArg(args, ScenarioPlaybackArg);
         var requestedMvp = HasArg(args, MvpArg);
         var isQuickLaunch = HasArg(args, QuickLaunchArg);
         var skipCs2Setup = isQuickLaunch || HasArg(args, SkipCs2SetupArg);
-        var skipSmartTrackWarmup = isQuickLaunch || HasArg(args, SkipSmartTrackWarmupArg);
 
         var overrides = new Dictionary<string, string?>
         {
             ["Gsi:Url"] = gsiBaseUrl,
-            ["Music:Provider"] = ResolveMusicProvider(configuration, isQuickLaunch, requestedUseMockSpotify)
+            ["Music:Provider"] = ResolveMusicProvider(configuration, isQuickLaunch)
         };
 
         if ((requestedIntentCapture || requestedMvp) && !requestedScenarioPlayback)
@@ -63,10 +58,10 @@ public static class ConsoleLaunchBootstrap
             overrides["Runtime:Mode"] = "scenario_playback";
         }
 
-        // --mvp is the one-command MVP launch: it implies intent_capture and turns the
-        // tester feature flags ON in memory so a single flag yields a host with timeline
-        // + playback observer active. The user controls playback with the keyboard media
-        // play/pause key (Spotify handles it natively); Undefault only observes and records.
+        // --mvp is leftover tester tooling, not the Tauon product MVP. It implies
+        // intent_capture and turns Timeline + PlaybackObserver ON in memory so a single
+        // flag yields an observe+record host. The user controls playback with the keyboard
+        // media play/pause key; Undefault only observes and records.
         // The git-tracked appsettings.json defaults (scenario_playback, flags false) stay
         // intact; these overrides win at runtime via the in-memory configuration collection
         // added in Apply.
@@ -81,16 +76,12 @@ public static class ConsoleLaunchBootstrap
             IsQuickLaunch: isQuickLaunch,
             IsMvpLaunch: requestedMvp,
             SkipCs2Setup: skipCs2Setup,
-            SkipSmartTrackWarmup: skipSmartTrackWarmup,
             ConfigurationOverrides: overrides);
     }
 
-    private static string ResolveMusicProvider(
-        IConfiguration configuration,
-        bool isQuickLaunch,
-        bool requestedUseMockSpotify)
+    private static string ResolveMusicProvider(IConfiguration configuration, bool isQuickLaunch)
     {
-        if (isQuickLaunch || requestedUseMockSpotify)
+        if (isQuickLaunch)
         {
             return "Mock";
         }

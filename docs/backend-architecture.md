@@ -71,7 +71,7 @@ This matters because the console bootstrap injects runtime overrides before most
 Its current responsibilities:
 
 - normalize the GSI base URL
-- resolve `Music:Provider` from `--quick` / `--use-mock-spotify` and configuration
+- resolve `Music:Provider` from `--quick` and configuration
 - resolve the runtime mode from `--intent-capture` / `--scenario-playback` / `--mvp`
 - apply config overrides in memory without mutating git-tracked files
 - bind Kestrel to the chosen local URL with `builder.WebHost.UseUrls(...)`
@@ -103,7 +103,6 @@ Current top-level sections:
 
 - `Spotify`
 - `Gsi`
-- `UseMockSpotify`
 - `EventDetector`
 - `SpotifyVolumeDuck`
 - `SmartTrackStart`
@@ -115,7 +114,6 @@ Current top-level sections:
 - Spotify redirect URI
 - Spotify scopes
 - GSI method/path/url
-- `UseMockSpotify`
 
 It intentionally preserves an existing `Spotify.ClientSecret` value in the JSON file rather than overwriting it from API input.
 
@@ -192,11 +190,10 @@ The backend is currently a Minimal API host with these main routes:
 | `POST` | `/gsi` | receive CS2 GSI payloads |
 | `POST` | `/gsi/dota` | receive Dota 2 GSI payloads — **event logging only** (no rules engine / Spotify actions yet) |
 | `POST` | `/gsi/reset` | reset detector, snapshot store, recent events, timeline session, and Dota/playback observer baselines |
-| `GET` | `/status` | GSI plus `IMusicPlayer` fields (`musicProvider`, `musicPlayerAvailable`, `playbackState`); leftover Spotify is `leftoverSpotifyStatus` |
+| `GET` | `/status` | GSI plus `IMusicPlayer` fields (`musicProvider`, `musicPlayerAvailable`, `playbackState`) |
 | `GET` | `/events` | recent normalized events |
 | `GET` | `/timeline` | recent unified timeline (GSI + playback + dota) — **intent_capture only** |
 | `GET` | `/timeline/episodes` | intent-episode windows (reserved — empty until a future intent source is added) — **intent_capture only** |
-| `GET` | `/spotify/status` | leftover diagnostics; credential/token fields are constants since UND-84 removed the OAuth layer |
 | `GET` | `/config` | read editable system config |
 | `PUT` | `/config` | save editable system config |
 | `GET` | `/control-profiles` | read console control profiles |
@@ -454,7 +451,7 @@ In this mode:
 - the host runs normally and GSI ingestion works
 - profile/config/setup endpoints work
 - leftover Spotify playback operations are loggable no-ops
-- `/spotify/status` reports `IsAuthenticated: false` and constant credential fields
+- `GET /spotify/status` is not mapped
 
 Real playback goes through `IMusicPlayer` (Tauon or `MockMusicPlayer`), not
 through this leftover path.
