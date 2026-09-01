@@ -144,3 +144,5 @@ That migration's AC will include bumping `Microsoft.AspNetCore.Mvc.Testing` to t
 `GsiHost` and `GsiHost.Tests` now target `net8.0-windows10.0.19041.0` so the host can consume WinRT/SMTC APIs. `GsiHost` also still builds `net8.0` because `Cs2Simulator.Tests` (which stays `net8.0`) references GsiHost DTOs/mapping; a `net8.0` test project cannot reference a Windows-only TFM. `Core`, `Core.Tests`, `Cs2Simulator`, `Cs2Simulator.Runtime`, `Cs2Simulator.Scenarios`, and `Cs2Simulator.Tests` remain `net8.0`. Core stays WinRT-free. No WinRT types or Windows Runtime packages are in GsiHost yet (the SMTC adapter is a later issue).
 
 This does not reopen UND-30 / UND-46. `Core.Tests` was aligned to `net8.0` in UND-46; the table in "Current TFM state" above is the UND-30 snapshot and is not current.
+
+`dotnet run` / `dotnet publish` for the host must pass `-f net8.0-windows10.0.19041.0`. The plain `net8.0` inner build is a compile shim for `Cs2Simulator.Tests`; it is not the ship TFM. UND-94 must condition WinRT / Dubya on the Windows TFM only.

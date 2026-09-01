@@ -13,7 +13,7 @@ round_start → resume
 death       → pause
 ```
 
-That is **Flow**: music during the round, pause on death. A later **Focus** preset (quiet while alive) is planned as a choice, not as the product.
+That is **Flow**: music during the round, pause on death. **Focus** (quiet while alive) is a shipped preset, not the product.
 
 ## What it is not
 
@@ -31,8 +31,8 @@ That is **Flow**: music during the round, pause on death. A later **Focus** pres
 ## Quick start (mock, ~2 min)
 
 ```powershell
-# Terminal 1 — host with mock player
-dotnet run --project .\GsiHost -- --quick
+# Terminal 1 — host with mock player (Windows TFM is required; GsiHost also builds net8.0 for Cs2Simulator.Tests)
+dotnet run --project .\GsiHost -f net8.0-windows10.0.19041.0 -- --quick
 
 # Terminal 2 — local CS2 GSI simulator
 dotnet run --project .\Cs2Simulator
