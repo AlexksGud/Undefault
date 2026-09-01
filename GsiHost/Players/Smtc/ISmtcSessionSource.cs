@@ -73,7 +73,9 @@ public interface ISmtcSessionSource
     /// Refreshes the underlying session dictionary.
     /// </summary>
     /// <remarks>
-    /// Exposed for later reattach work (UND-97). The adapter does not call this yet.
+    /// Called by <c>SmtcMusicPlayer</c> when the selected id is absent, both on the command
+    /// path and from a low-frequency timer. Not a substitute for exact-id targeting.
+    /// Dubya <c>SessionsChanged</c> is not used as the sole reattach signal.
     /// </remarks>
     void ForceUpdate();
 }
