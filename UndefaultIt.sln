@@ -19,6 +19,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cs2Simulator.Tests", "Cs2Si
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cs2Simulator.Runtime", "Cs2Simulator.Runtime\Cs2Simulator.Runtime.csproj", "{226E28E5-92DE-411E-8F6A-7ECC16A85D75}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{07C2787E-EAC7-C090-1BA3-A61EC2A24D84}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmtcSpike", "tools\SmtcSpike\SmtcSpike.csproj", "{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -125,8 +129,23 @@ Global
 		{226E28E5-92DE-411E-8F6A-7ECC16A85D75}.Release|x64.Build.0 = Release|Any CPU
 		{226E28E5-92DE-411E-8F6A-7ECC16A85D75}.Release|x86.ActiveCfg = Release|Any CPU
 		{226E28E5-92DE-411E-8F6A-7ECC16A85D75}.Release|x86.Build.0 = Release|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Debug|x64.Build.0 = Debug|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Debug|x86.Build.0 = Debug|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Release|x64.ActiveCfg = Release|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Release|x64.Build.0 = Release|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Release|x86.ActiveCfg = Release|Any CPU
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{226F89A0-BF2F-4F7F-B20A-60F53E8920D8} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 	EndGlobalSection
 EndGlobal
