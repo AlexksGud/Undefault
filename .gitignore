@@ -196,5 +196,8 @@ appsettings.Local.json
 # Runtime timeline capture sessions (intent_capture JSONL)
 GsiHost/timeline/
 
+# Local MVP+ go/no-go counters (UND-98); written next to the host at runtime
+go-no-go-counters.json
+
 # Test runner output (CI uploads this as a workflow artifact)
 TestResults/
