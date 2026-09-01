@@ -75,7 +75,11 @@ builder.Services.AddSingleton<ISnapshotModuleMapper, PositionModuleMapper>();
 builder.Services.AddSingleton<ISnapshotModuleMapper, CombatModuleMapper>();
 builder.Services.AddSingleton<ISnapshotModuleMapper, RoundModuleMapper>();
 
-BuildMusicPlayer(builder);
+var resolvedMusicProvider = MusicProviderResolver.Resolve(builder.Configuration);
+MusicProviderResolver.EnsurePlayerRegistered(resolvedMusicProvider);
+builder.Services.AddSingleton(resolvedMusicProvider);
+
+BuildMusicPlayer(builder, resolvedMusicProvider.CanonicalName);
 builder.Services.AddSingleton<IMusicPlaybackControl, MusicPlaybackControlCoordinator>();
 
 builder.Services.Configure<RulesEngineOptions>(
@@ -100,15 +104,7 @@ builder.Services.Configure<TauonOptions>(
     builder.Configuration.GetSection(TauonOptions.SectionName));
 
 var app = builder.Build();
-
-var resolvedMusicProvider = app.Configuration["Music:Provider"] ?? "Tauon";
-if (!string.Equals(resolvedMusicProvider, "Tauon", StringComparison.OrdinalIgnoreCase)
-    && !string.Equals(resolvedMusicProvider, "Mock", StringComparison.OrdinalIgnoreCase))
-{
-    app.Logger.LogWarning(
-        "Music:Provider '{Provider}' is unknown; using Tauon.",
-        resolvedMusicProvider);
-}
+app.Logger.LogInformation("Music provider: {Provider}", resolvedMusicProvider.CanonicalName);
 
 if (!consoleLaunchSettings.SkipCs2Setup)
 {
@@ -148,7 +144,7 @@ app.MapPost("/gsi/reset", (IOptions<GsiOptions> gsiOptions, IGsiResetService res
 app.MapGet("/status", async (
     IAppStateService appStateService,
     IMusicPlayer musicPlayer,
-    IConfiguration configuration,
+    MusicProviderResolution musicProviderResolution,
     CancellationToken cancellationToken) =>
 {
     var status = await appStateService.GetCurrentStatusAsync(cancellationToken);
@@ -172,7 +168,7 @@ app.MapGet("/status", async (
         status.LastSnapshotAt,
         status.Game,
         status.LastEvent,
-        musicProvider = configuration["Music:Provider"] ?? "Tauon",
+        musicProvider = musicProviderResolution.CanonicalName,
         musicPlayerAvailable = musicState is not null,
         playbackState = musicState?.Status.ToString() ?? "Unavailable",
         currentTrack = musicState?.Track
@@ -264,22 +260,27 @@ _ = app.Services.GetRequiredService<TimelineCaptureService>();
 
 app.Run();
 
-void BuildMusicPlayer(WebApplicationBuilder webApplicationBuilder)
+void BuildMusicPlayer(WebApplicationBuilder webApplicationBuilder, string provider)
 {
-    var provider = webApplicationBuilder.Configuration["Music:Provider"] ?? "Tauon";
-    if (string.Equals(provider, "Mock", StringComparison.OrdinalIgnoreCase))
+    if (string.Equals(provider, MusicProviderOptions.Mock, StringComparison.OrdinalIgnoreCase))
     {
         webApplicationBuilder.Services.AddSingleton<IMusicPlayer, MockMusicPlayer>();
         return;
     }
 
-    // Unknown values fall through to Tauon (logged after the host is built).
-    webApplicationBuilder.Services.AddHttpClient(TauonMusicPlayer.HttpClientName, (sp, client) =>
+    if (string.Equals(provider, MusicProviderOptions.Tauon, StringComparison.OrdinalIgnoreCase))
     {
-        var opts = sp.GetRequiredService<IOptions<TauonOptions>>().Value ?? new TauonOptions();
-        TauonMusicPlayer.ConfigureClient(client, opts);
-    });
-    webApplicationBuilder.Services.AddSingleton<IMusicPlayer, TauonMusicPlayer>();
+        webApplicationBuilder.Services.AddHttpClient(TauonMusicPlayer.HttpClientName, (sp, client) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<TauonOptions>>().Value ?? new TauonOptions();
+            TauonMusicPlayer.ConfigureClient(client, opts);
+        });
+        webApplicationBuilder.Services.AddSingleton<IMusicPlayer, TauonMusicPlayer>();
+        return;
+    }
+
+    throw new InvalidOperationException(
+        $"Music:Provider '{provider}' is not registered.");
 }
 
 static async Task EnsureCs2SetupAsync(WebApplication app)
@@ -344,9 +345,11 @@ static async Task WriteConsoleStartupChecklistAsync(
             string.Equals(profile.Id, controlProfiles.ActiveProfileId, StringComparison.OrdinalIgnoreCase))
             ?? controlProfiles.Profiles.FirstOrDefault();
 
+    var musicProvider = app.Services.GetRequiredService<MusicProviderResolution>().CanonicalName;
+
     Console.WriteLine();
     Console.WriteLine("UndefaultIt console startup");
-    Console.WriteLine($"- Music provider: {app.Configuration["Music:Provider"] ?? "Tauon"}");
+    Console.WriteLine($"- Music provider: {musicProvider}");
     Console.WriteLine($"- Quick launch mode: {(consoleLaunchSettings.IsQuickLaunch ? "yes" : "no")}");
     Console.WriteLine($"- MVP launch (--mvp): {(consoleLaunchSettings.IsMvpLaunch ? "yes — intent_capture (observe only; music.control_profile is not executed)" : "no")}");
     Console.WriteLine($"- CS2 setup: {(consoleLaunchSettings.SkipCs2Setup ? "skipped" : "attempted")}");
