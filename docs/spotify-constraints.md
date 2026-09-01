@@ -1,6 +1,6 @@
 # Spotify constraints (agent)
 
-Researched 2026-08-14 against current Spotify developer docs. **Spotify is not a product backend for Undefault.** Leftover `Core/Spotify` / OAuth code is debt. Do not add Spotify features, adapters, or docs.
+Researched 2026-08-14 against current Spotify developer docs. **Spotify is dropped** as a product backend (confirmed 2026-09-01). Leftover `Core/Spotify` / OAuth code is deletion-only (UND-84). Do not add Spotify features, adapters, OAuth, apps, or docs. Do not file Linear work that revives Spotify.
 
 Primary player: Tauon. See [product-pivot-2026-08-14.md](product-pivot-2026-08-14.md).
 
@@ -34,8 +34,8 @@ Do not plan testers, packaging, or a public Spotify provider on Dev Mode.
 
 - Do not implement `SpotifyMusicPlayer` as a user-facing provider.
 - Do not expand OAuth, quotas, Smart Track Start, or `spotify.profile`.
-- After Tauon works, delete leftover Spotify code when unused (`PIVOT-10`).
-- If touching leftover Spotify files: no token/secret logging; no new scopes; no new player endpoints.
+- OAuth/real-client code is gone (UND-84). Remaining mock observe leftovers are UND-101. Do not keep a compatibility adapter.
+- If touching leftover Spotify files before deletion: no token/secret logging; no new scopes; no new player endpoints.
 - Game→music automation uses Tauon/mock only.
 
 ## Sources

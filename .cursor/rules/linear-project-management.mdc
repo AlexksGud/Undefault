@@ -5,7 +5,8 @@ alwaysApply: true
 
 # Linear Project Management
 
-- Treat Linear as the source of truth for product scope **when an Undefault Linear project is connected**. If the MCP workspace is not Undefault, use [docs/roadmap.md](docs/roadmap.md) `PIVOT-*` IDs and do not file Undefault work in another product.
+- Treat Linear as the source of truth for product scope. This workspace's Linear MCP is Undefault (team `UND`, project `undefault`). If MCP ever points at another product, do not file Undefault work there; use [docs/roadmap.md](docs/roadmap.md) `PIVOT-*` IDs instead.
+- Current product MVP is CS2 + Tauon control (UND-82). Spotify product work is canceled; leftover Spotify is excision only (UND-84). Do not file Spotify adapters, OAuth, or apps.
 - When the user asks to manage work, prefer Linear (or the in-repo roadmap if Linear is unavailable) over chat-only plans.
 - Do not create implementation tasks from design tasks until the product owner approves the design/proposal.
 - Keep implementation work delegated from specific Linear issues; update issue status before and after delegated work.

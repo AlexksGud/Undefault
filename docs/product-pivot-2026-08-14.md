@@ -27,7 +27,7 @@ Undefault does **not** own the music catalog.
 
 **Tauon Music Box**, via its remote HTTP API. Undefault and Tauon stay independent projects. Do not fork or patch Tauon.
 
-Spotify is **not** a product backend. Playback control via the Web API is a Streaming SDA; game-adjacent use, synchronization with visuals, and commercial Streaming SDAs are restricted. Development Mode is a 5-user tinkering sandbox, not a ship path. See [spotify-constraints.md](spotify-constraints.md). Leftover Spotify code is to be removed after Tauon works, not wrapped as a user-facing provider.
+Spotify is **dropped**. Playback control via the Web API is a Streaming SDA; game-adjacent use, synchronization with visuals, and commercial Streaming SDAs are restricted. Development Mode is a 5-user tinkering sandbox, not a ship path. See [spotify-constraints.md](spotify-constraints.md). Leftover Spotify code is deletion-only (UND-84). Do not wrap it as a user-facing provider or file new Spotify work.
 
 ## Approved MVP loop
 
@@ -42,8 +42,12 @@ Not in this MVP: `round_end`, victory/defeat tracks, playlist/queue/track-id pla
 
 ## Current code vs this decision
 
-`PIVOT-1`–`PIVOT-8` are in-repo. Live automation is `music.control_profile` with `round_start → resume` / `death → pause` through `IMusicPlayer` (Tauon default, Mock for `--quick`). Leftover Spotify types remain until `PIVOT-10`. Live Tauon smoke is `PIVOT-9`.
+`PIVOT-1`–`PIVOT-8` are in-repo. Live automation is `music.control_profile` with `round_start → resume` / `death → pause` through `IMusicPlayer` (Tauon default, Mock for `--quick`). Leftover Spotify types remain until excision (`PIVOT-10` / UND-84). Live Tauon smoke is `PIVOT-9` / UND-83.
 
-## Linear
+## Linear (2026-09-01)
 
-This repo still prefers Linear as the issue tracker. The Cursor Linear MCP in this workspace currently points at **Counterplay**, not Undefault. Until an Undefault Linear project is connected, the in-repo roadmap IDs (`PIVOT-*`) are the working backlog.
+Linear workspace **Undefault** is connected. Source of truth: project [undefault](https://linear.app/undefault/project/undefault-2856eb466d02), decision [MVP decision — 2026-09-01](https://linear.app/undefault/document/mvp-decision-2026-09-01-cs2-tauon-spotify-dropped-ae332adffdfc).
+
+Current MVP umbrella: [UND-82](https://linear.app/undefault/issue/UND-82/mvp-cs2-player-control-rulesevents-tauon). Old intent_capture/Spotify MVP ([UND-64](https://linear.app/undefault/issue/UND-64/mvp-minimal-playable-slice-connect-hotkeys-record-pauseresume-intent)) is canceled.
+
+Optional later (not this MVP): a seam for an external, user-operated music import companion ([UND-86](https://linear.app/undefault/issue/UND-86/design-optional-external-music-import-companion)). Design only until approved. Undefault still does not own the catalog.

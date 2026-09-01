@@ -28,8 +28,8 @@ Use this workflow to manage Undefault as a Linear-first project while implementa
 - Linear is the source of truth for scope and status.
 - Do not create implementation issues from design tasks until the product owner approves the proposal.
 - Keep `Hotkeys + Timeline` as tester/product-owner tooling, not client UI.
-- Keep Spotify behavior framed as local playback control.
-- Preserve the current CS2 baseline unless an issue explicitly changes it.
+- Spotify is dropped. Do not file or implement Spotify adapters, OAuth, or apps. Leftover deletion is UND-84.
+- Preserve the current CS2 + Tauon baseline (`round_start → resume`, `death → pause`) unless an issue explicitly changes it.
 - Do not commit, push, or create PRs unless the user explicitly asks.
 
 ## Status Template

@@ -1,10 +1,10 @@
 # Roadmap
 
-Product direction: [product-pivot-2026-08-14.md](product-pivot-2026-08-14.md).
+Product direction: [product-pivot-2026-08-14.md](product-pivot-2026-08-14.md). Locked Linear decision: [MVP decision — 2026-09-01](https://linear.app/undefault/document/mvp-decision-2026-09-01-cs2-tauon-spotify-dropped-ae332adffdfc).
 
-Undefault is a game-aware music automation layer. The first player backend is Tauon. Spotify is leftover code, not a provider to keep.
+Undefault is a game-aware music automation layer. The first player backend is Tauon. Spotify is dropped: leftover code is deletion-only, not a provider to keep or revive.
 
-This file is the working backlog while Linear Undefault is not connected from this workspace (MCP currently sees Counterplay). Copy `PIVOT-*` into Linear when that project is available.
+Linear (workspace Undefault, project `undefault`) is the source of truth for open work. In-repo `PIVOT-*` IDs below map to Linear issues.
 
 ## How to read this
 
@@ -19,8 +19,8 @@ This file is the working backlog while Linear Undefault is not connected from th
 - Pipeline: CS2 GSI → adapter → detector → `RulesEngine` → `music.control_profile` (`spotify.control_profile` alias still registered)
 - Default rules: `round_start → resume`, `death → pause`
 - Device: `IMusicPlayer` (`TauonMusicPlayer` default, `MockMusicPlayer` for `--quick`)
-- Leftover Spotify types remain until `PIVOT-10`; the OAuth/real-client layer was deleted in UND-84, so leftover Spotify is always the mock client
-- `--mvp` still means `intent_capture` observe+record (UND-64), not the Tauon product MVP
+- Leftover Spotify mock observe path remains until `PIVOT-10` / UND-101; the OAuth/real-client layer was deleted in UND-84. Do not add a Spotify adapter.
+- `--mvp` still means leftover `intent_capture` observe+record (canceled UND-64), not the Tauon product MVP
 - Dota: `POST /gsi/dota` logs only (UND-80)
 - Safety/mixer: shadow diagnostics only
 
@@ -72,23 +72,29 @@ Do not redesign GSI/rules. Smallest `IMusicPlayer` only.
 | ID | Task | Depends | Acceptance | Status |
 |---|---|---|---|---|
 | PIVOT-8 | Core: round_start→resume, death→pause, repeated events are idempotent. Tauon: play/pause/resume/next/previous/state/track/volume + refused/timeout/404/malformed/unexpected status. | PIVOT-3–7 | `dotnet test` green without Tauon | Done in-repo |
-| PIVOT-9 | Manual proof: Tauon up → simulator resume/pause; Tauon down → host + GSI still run. | PIVOT-8 | Matches Definition of Done in the pivot note | Not started |
+| PIVOT-9 | Manual proof: Tauon up → simulator resume/pause; Tauon down → host + GSI still run. | PIVOT-8 | Matches Definition of Done in the pivot note | Linear: [UND-83](https://linear.app/undefault/issue/UND-83/live-tauon-smoke-round-start-resume-death-pause) Todo |
 
-## Milestone 5 — Remove leftover Spotify (after green)
+## Milestone 5 — Spotify excision (after green)
 
-| ID | Task | Depends | Acceptance |
-|---|---|---|---|
-| PIVOT-10 | Delete unused Spotify OAuth/client/action paths once Tauon+mock own playback. Do not add `SpotifyMusicPlayer`. | PIVOT-9 | Automation path has no Spotify types |
-| PIVOT-11 | Rename leftover `--quick` / `/spotify/*` flags and comments to player/mock wording. | PIVOT-10 | README/quick-launch match running flags |
+Spotify will not return as a product backend. These tasks delete leftovers; they are not a Spotify track.
+
+| ID | Task | Depends | Acceptance | Linear |
+|---|---|---|---|---|
+| PIVOT-10 | Delete unused Spotify OAuth/client/action paths once Tauon+mock own playback. Do not add `SpotifyMusicPlayer`. | PIVOT-9 | Automation path has no Spotify types | [UND-84](https://linear.app/undefault/issue/UND-84/delete-leftover-spotify-oauthclientaction-paths) Done (OAuth); leftover observe path is [UND-101](https://linear.app/undefault/issue/UND-101/delete-the-remaining-ispotifyclient-observe-path-and-the-corespotify) |
+| PIVOT-11 | Rename leftover `--quick` / `/spotify/*` flags and comments to player/mock wording. | PIVOT-10 | README/quick-launch match running flags | [UND-85](https://linear.app/undefault/issue/UND-85/rename-leftover-quick-spotify-flags-and-comments) |
+
+Current MVP umbrella: [UND-82](https://linear.app/undefault/issue/UND-82/mvp-cs2-player-control-rulesevents-tauon).
 
 ## Later (not scheduled)
 
 Keep as specs, not current build work:
 
+- optional external music import companion (design only: [UND-86](https://linear.app/undefault/issue/UND-86/design-optional-external-music-import-companion))
 - `round_end` detector (CS2 `phase=over` is mapped to `Unknown` today)
 - live safety mixer / coalescer (shadow already exists)
+- extra CS2 scenarios / visualization (deferred Linear milestone)
 - Dota adapter beyond logging (UND-45)
-- persistent tokens / packaging (Tauon-first; no tester Spotify app)
+- packaging
 - Jellyfin or other **non-Spotify** players
 - UI
 
@@ -96,6 +102,6 @@ Keep as specs, not current build work:
 
 - Evolution, not a rewrite.
 - One playback side-effect path per GSI tick.
-- Do not rebuild a music player or a Spotify clone.
+- Do not rebuild a music player, a catalog, or a Spotify clone. Do not file Spotify work.
 - Tauon API is unstable; keep the adapter thin.
 - Safety still dominates adaptivity when that engine is wired; it is not the Tauon MVP.

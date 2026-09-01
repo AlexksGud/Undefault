@@ -16,8 +16,8 @@ Workflow:
 6. Delegate implementation or investigation to separate agents from specific issue IDs.
 
 Project rules:
-- Linear is the source of truth **when an Undefault project is connected**. If MCP is on another workspace (e.g. Counterplay), do not create Undefault issues there; use [docs/roadmap.md](docs/roadmap.md) `PIVOT-*` instead.
-- Preserve the local playback-control boundary (any non-Spotify player). Tauon is the first backend. Do not file Spotify adapter work.
+- Linear workspace Undefault is the source of truth. If MCP ever points at another product, do not create Undefault issues there; use [docs/roadmap.md](docs/roadmap.md) `PIVOT-*` instead.
+- Preserve the local playback-control boundary. Tauon is the first backend. Spotify is dropped: do not file Spotify adapter, OAuth, or app work. Leftover deletion is UND-84.
 - Timeline / observe-mode is tester tooling, not the Tauon product MVP.
 - Do not mark issues `Done` until acceptance criteria are verified.
 - Do not commit, push, or create PRs unless the user explicitly asks.

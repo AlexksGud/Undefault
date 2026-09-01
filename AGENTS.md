@@ -7,7 +7,7 @@ Internal constraints for Cursor / coding agents working on this repo. Not part o
 - `UndefaultIt` is a Windows-first local .NET backend: game events drive an external music player.
 - Current runtime focus: `CS2` + `GsiHost`.
 - **Approved target (2026-08-14):** Tauon via `IMusicPlayer`; default rules `round_start → resume`, `death → pause`. See [docs/product-pivot-2026-08-14.md](docs/product-pivot-2026-08-14.md).
-- **Current code:** `music.control_profile` with `round_start → resume` / `death → pause` through `IMusicPlayer` (Tauon default, Mock for `--quick`). Leftover Spotify types remain until `PIVOT-10`. Do not add a Spotify adapter. `PIVOT-9` is still the live Tauon smoke.
+- **Current code:** `music.control_profile` with `round_start → resume` / `death → pause` through `IMusicPlayer` (Tauon default, Mock for `--quick`). OAuth/real-client Spotify is gone ([UND-84](https://linear.app/undefault/issue/UND-84/delete-leftover-spotify-oauthclientaction-paths)); remaining mock observe path is [UND-101](https://linear.app/undefault/issue/UND-101/delete-the-remaining-ispotifyclient-observe-path-and-the-corespotify). Do not add a Spotify adapter. Live Tauon smoke is [UND-83](https://linear.app/undefault/issue/UND-83/live-tauon-smoke-round-start-resume-death-pause).
 
 ## Modules
 
@@ -26,10 +26,10 @@ Internal constraints for Cursor / coding agents working on this repo. Not part o
 - Do not fork Tauon. Adapter uses the verified remote HTTP API only ([docs/tauon-integration.md](docs/tauon-integration.md)).
 - One orchestration entry applies playback side effects per GSI tick.
 - Playback policy: local control of the user's player, not a synchronized soundtrack ([docs/spotify-playback-policy-boundary.md](docs/spotify-playback-policy-boundary.md)).
-- Spotify is not a product backend ([docs/spotify-constraints.md](docs/spotify-constraints.md)). Do not add Spotify features.
+- Spotify is dropped ([docs/spotify-constraints.md](docs/spotify-constraints.md)). Do not add Spotify features, OAuth, apps, or adapters. Leftover code is deletion-only (UND-84).
 - Safety-first music architecture is documented; do not wire live mixer side effects in the Tauon MVP.
 - No full Dota 2 runtime: `POST /gsi/dota` logs only (UND-80); UND-45 is later.
-- Prefer Linear as the source of truth when an Undefault project is connected; otherwise use [docs/roadmap.md](docs/roadmap.md) `PIVOT-*` IDs. This workspace's Linear MCP currently points at Counterplay — do not file Undefault work there.
+- Linear workspace Undefault is the source of truth. Current MVP: [UND-82](https://linear.app/undefault/issue/UND-82/mvp-cs2-player-control-rulesevents-tauon). In-repo `PIVOT-*` IDs in [docs/roadmap.md](docs/roadmap.md) map to those issues.
 
 ## Read first
 

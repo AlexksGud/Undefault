@@ -6,7 +6,7 @@ alwaysApply: true
 # Product Boundaries
 
 - Describe Undefault as a game-aware music automation layer that controls an external player. It is not a synchronized soundtrack and it does not own the catalog.
-- First player backend: Tauon (remote HTTP). Spotify is leftover code, not a product provider ([docs/spotify-constraints.md](docs/spotify-constraints.md)).
+- First player backend: Tauon (remote HTTP). Spotify is dropped, not a product provider ([docs/spotify-constraints.md](docs/spotify-constraints.md)). Leftover Spotify code is deletion-only.
 - Keep CS2 as the first game, but avoid making shared Core/music contracts depend on CS2-only terms when a neutral concept exists.
 - Core must not contain Tauon- or Spotify-specific HTTP/OAuth. Provider details stay in adapters.
 - Safety dominates adaptivity when that engine is live: `Danger` overrides scenario output, mixer/envelope gain, profile restore, and future automated behavior. The Tauon MVP does not wire live mixer side effects.
@@ -19,7 +19,8 @@ Supersedes the UND-64 `intent_capture` observe+record slice as the **product** M
 
 - Default automation target: `round_start → resume`, `death → pause`.
 - Do not implement `round_end`, playlists, track-id playback, Dota music actions, or UI in that slice.
-- Current `main` implements that automation via `IMusicPlayer` / Tauon (Mock for `--quick`). Leftover Spotify code remains until `PIVOT-10`. Do not add a Spotify adapter.
+- Current `main` implements that automation via `IMusicPlayer` / Tauon (Mock for `--quick`). Spotify OAuth is gone (UND-84); remaining mock observe leftovers are UND-101. Do not add a Spotify adapter.
+- Optional later: an external music import companion is design-only until approved (UND-86). Do not put a downloader in Core.
 
 Source: [docs/product-pivot-2026-08-14.md](docs/product-pivot-2026-08-14.md), [docs/roadmap.md](docs/roadmap.md).
 

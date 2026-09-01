@@ -4,9 +4,9 @@
 
 **Game-aware music automation** — a local Windows backend in .NET 8. CS2 game state drives pause/resume (and later other commands) on the user's existing music player. Undefault does not own the music catalog. It is local playback control, not a synchronized soundtrack.
 
-The first target player is **Tauon Music Box**. Spotify is leftover code on `main`, not a product backend ([docs/spotify-constraints.md](docs/spotify-constraints.md)).
+The first target player is **Tauon Music Box**. Spotify is dropped ([docs/spotify-constraints.md](docs/spotify-constraints.md)). OAuth is gone (UND-84); remaining mock observe leftovers are deletion-only (UND-101).
 
-> **Code vs docs (2026-08-14):** The approved direction is in [docs/product-pivot-2026-08-14.md](docs/product-pivot-2026-08-14.md). `PIVOT-1`–`PIVOT-8` are in-repo: default rules are `round_start → resume`, `death → pause` via Tauon/`IMusicPlayer`. Leftover Spotify code remains until `PIVOT-10`. Live Tauon smoke is `PIVOT-9`.
+> **Code vs docs (2026-09-01):** Current MVP is CS2 + Tauon (`round_start → resume`, `death → pause`). `PIVOT-1`–`PIVOT-8` are in-repo. Live Tauon smoke is [UND-83](https://linear.app/undefault/issue/UND-83/live-tauon-smoke-round-start-resume-death-pause). Spotify leftover deletion is [UND-84](https://linear.app/undefault/issue/UND-84/delete-leftover-spotify-oauthclientaction-paths). Direction: [docs/product-pivot-2026-08-14.md](docs/product-pivot-2026-08-14.md).
 
 ## Highlights
 
