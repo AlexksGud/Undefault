@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Undefault — pick a player</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <header class="intro">
+      <p class="eyebrow">Local host only</p>
+      <h1>Pick the player this host should control</h1>
+      <p class="lede">
+        Undefault pauses and resumes the music player already running on this machine
+        when CS2 events happen. It does not play its own tracks.
+      </p>
+    </header>
+
+    <noscript>
+      <p class="banner">This page needs JavaScript on the local host to list sessions and run test commands.</p>
+    </noscript>
+
+    <ol class="path">
+      <li>Press play in the player you want to control.</li>
+      <li>Click that session below. Nothing is selected until you click.</li>
+      <li>Test pause and resume so you know this host can reach it.</li>
+      <li>Confirm the CS2 Game State Integration config is in place.</li>
+    </ol>
+
+    <p id="host-banner" class="banner" hidden></p>
+
+    <section id="sessions-section" aria-labelledby="sessions-heading">
+      <div class="section-head">
+        <h2 id="sessions-heading">Playback sessions</h2>
+        <p class="meta" id="sessions-updated">This list refreshes while players appear or disappear.</p>
+      </div>
+      <p id="selection-status" class="status-line">Nothing selected. Click a session to choose it.</p>
+      <div id="sessions-list">
+        <p class="empty" id="sessions-empty">
+          No sessions yet. That is normal while a player is idle. Windows only lists an
+          app after playback has started. Press play in the player you want to control;
+          this list will refresh.
+        </p>
+      </div>
+    </section>
+
+    <section id="test-section" aria-labelledby="test-heading">
+      <h2 id="test-heading">Test pause and resume</h2>
+      <p>
+        These buttons talk to the session you selected. They are how you confirm
+        this host can control that player before a match.
+      </p>
+      <div class="actions">
+        <button type="button" id="btn-pause">Test pause</button>
+        <button type="button" id="btn-resume">Test resume</button>
+      </div>
+      <p id="test-outcome" class="outcome" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="cs2-section" aria-labelledby="cs2-heading">
+      <h2 id="cs2-heading">CS2 Game State Integration</h2>
+      <p>
+        CS2 has to post game state to this host. If the config file is missing,
+        install it here.
+      </p>
+      <p id="cs2-status" class="status-line">Checking CS2 setup…</p>
+      <div class="actions">
+        <button type="button" id="btn-cs2-install">Install or update the CS2 config</button>
+      </div>
+      <p id="cs2-outcome" class="outcome" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="preset-section" aria-labelledby="preset-heading">
+      <h2 id="preset-heading">Round behavior</h2>
+      <p>
+        Default is Flow: music during the round. Focus is an optional preset this
+        host already ships (quiet while you are alive). It is a behavior choice,
+        not what this page is for.
+      </p>
+      <div class="preset-row" role="group" aria-labelledby="preset-heading">
+        <button type="button" id="btn-flow" class="preset" data-preset="Flow">
+          <strong>Flow</strong>
+          <span>Resume at round start, pause on death.</span>
+        </button>
+        <button type="button" id="btn-focus" class="preset" data-preset="Focus">
+          <strong>Focus</strong>
+          <span>Pause at round start, resume on death.</span>
+        </button>
+      </div>
+      <p id="preset-status" class="status-line"></p>
+    </section>
+
+    <section id="last-section" aria-labelledby="last-heading">
+      <h2 id="last-heading">Last command</h2>
+      <p id="last-command" class="status-line">No command has been sent yet.</p>
+    </section>
+
+    <footer>
+      <p>
+        Served by this machine’s Undefault host. No account, no remote access.
+      </p>
+    </footer>
+  </main>
+  <script src="app.js" defer></script>
+</body>
+</html>

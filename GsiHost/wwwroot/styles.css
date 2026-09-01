@@ -1,0 +1,291 @@
+:root {
+  --bg: #f3eee4;
+  --surface: #fffaf1;
+  --ink: #1b1814;
+  --muted: #5e574c;
+  --line: #d4cbb8;
+  --accent: #214f44;
+  --accent-soft: #dceae4;
+  --ok: #1d5c3b;
+  --ok-bg: #e4f1e8;
+  --warn: #7a3410;
+  --warn-bg: #f7e7dc;
+  --focus: #1b1814;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 18px;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.45;
+}
+
+main {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.intro h1 {
+  margin: 0.2rem 0 0.75rem;
+  font-size: 1.85rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lede,
+section p,
+.path,
+footer p,
+.status-line,
+.meta,
+.empty,
+.outcome {
+  color: var(--ink);
+}
+
+.lede,
+section p {
+  margin: 0 0 1rem;
+}
+
+.path {
+  margin: 0 0 1.75rem;
+  padding-left: 1.25rem;
+}
+
+.path li + li {
+  margin-top: 0.35rem;
+}
+
+section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1.15rem 1.15rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+section h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  align-items: baseline;
+  margin-bottom: 0.35rem;
+}
+
+.section-head h2 {
+  margin-bottom: 0;
+}
+
+.meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.status-line,
+.empty,
+.outcome {
+  margin: 0.5rem 0 0;
+}
+
+.empty {
+  padding: 0.85rem 0.9rem;
+  background: var(--accent-soft);
+  border-radius: 4px;
+}
+
+.banner {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-radius: 4px;
+}
+
+.banner[hidden] {
+  display: none;
+}
+
+.session {
+  display: block;
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.8rem 0.9rem;
+  text-align: left;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.session:hover {
+  border-color: var(--accent);
+}
+
+.session[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.session-name {
+  display: block;
+  font-weight: 650;
+}
+
+.session-id {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.session-meta {
+  display: block;
+  margin-top: 0.35rem;
+}
+
+.hint {
+  display: inline-block;
+  margin-top: 0.4rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+button:focus-visible,
+.session:focus-visible,
+.preset:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.preset-row {
+  display: grid;
+  gap: 0.6rem;
+}
+
+@media (min-width: 36rem) {
+  .preset-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-weight: 400;
+  text-align: left;
+}
+
+.preset strong {
+  font-weight: 650;
+}
+
+.preset span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.preset[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.outcome.ok {
+  padding: 0.55rem 0.7rem;
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-radius: 4px;
+}
+
+.outcome.warn {
+  padding: 0.55rem 0.7rem;
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-radius: 4px;
+}
+
+footer {
+  margin-top: 1.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+footer p {
+  color: var(--muted);
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
+}
