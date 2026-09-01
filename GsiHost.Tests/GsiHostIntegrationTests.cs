@@ -890,12 +890,23 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
         public Task<MusicPlaybackState?> GetStateAsync(CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("Player unavailable");
 
-        public Task PlayAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task PauseAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task ResumeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task NextAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task PreviousAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task SetVolumeAsync(int volumePercent, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<MusicCommandResult> PlayAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
+
+        public Task<MusicCommandResult> PauseAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
+
+        public Task<MusicCommandResult> ResumeAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
+
+        public Task<MusicCommandResult> NextAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
+
+        public Task<MusicCommandResult> PreviousAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
+
+        public Task<MusicCommandResult> SetVolumeAsync(int volumePercent, CancellationToken cancellationToken = default)
+            => Task.FromResult(MusicCommandResult.Applied);
     }
 
     private TestHostContext CreateTestHost(
