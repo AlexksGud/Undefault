@@ -1,6 +1,7 @@
 # Предложение: четыре редакционные правки
 
 **Статус:** proposal for review (не approved scope)  
+**Ревью:** [editorial-fixes-review-2026-09-04.md](editorial-fixes-review-2026-09-04.md) — читать перед реализацией  
 **Дата:** 2026-09-04  
 **Контекст:** tech-lead audit leftover / overengineering после product pivot (Tauon + Flow) и SMTC onboarding
 
