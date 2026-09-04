@@ -48,6 +48,13 @@ These specs stay valid for a future safety/mixer engine. They are **not** curren
 | [Multi-adapter routing](multi-adapter-routing.md) | One host, per-title endpoints |
 | [Mandatory CS2 ingestion](mandatory-cs2-ingestion-checklist.md) | Inputs before a richer music controller |
 
+## Working notes (not product docs)
+
+| Document | What it covers |
+|----------|----------------|
+| [Editorial fixes proposal (2026-09-04)](editorial-fixes-proposal-2026-09-04.md) | Four leftover/overengineering items; revised after review |
+| [Editorial fixes review (2026-09-04)](editorial-fixes-review-2026-09-04.md) | Tech-lead review + second-pass validation; source of truth for implementation |
+
 ## Archive
 
 Superseded slices and long Spotify research: [archive/](archive/README.md).
