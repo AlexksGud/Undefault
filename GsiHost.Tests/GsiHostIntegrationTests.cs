@@ -150,36 +150,21 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         doc.RootElement.TryGetProperty("useMockSpotify", out _).Should().BeFalse();
         doc.RootElement.TryGetProperty("UseMockSpotify", out _).Should().BeFalse();
+        doc.RootElement.TryGetProperty("spotify", out _).Should().BeFalse();
+        doc.RootElement.TryGetProperty("Spotify", out _).Should().BeFalse();
+        doc.RootElement.TryGetProperty("gsi", out _).Should().BeTrue();
     }
 
     [Fact]
-    public async Task ProfilesEndpoint_RoundTripsNewSchema()
+    public async Task ProfilesEndpoint_IsNotMapped()
     {
         using var host = CreateTestHost();
 
-        var payload = new MusicProfilesConfig(
-            "default",
-            new List<MusicProfile>
-            {
-                new(
-                    "default",
-                    "Default",
-                    new List<EventTrackRule>
-                    {
-                        new("death", new List<string> { "spotify:track:death_song" }),
-                        new("custom:clutch_1v3", new List<string> { "spotify:track:clutch_song" })
-                    })
-            });
+        var getResponse = await host.Client.GetAsync("/profiles");
+        getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        var saveResponse = await host.Client.PutAsJsonAsync("/profiles", payload);
-        saveResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
-
-        var roundTrip = await host.Client.GetFromJsonAsync<MusicProfilesConfig>("/profiles");
-
-        roundTrip.Should().NotBeNull();
-        roundTrip!.Profiles.Should().ContainSingle();
-        roundTrip.Profiles[0].Rules.Should().HaveCount(2);
-        roundTrip.Profiles[0].FindRule("CUSTOM:CLUTCH_1V3")!.Tracks.Should().ContainSingle("spotify:track:clutch_song");
+        var putResponse = await host.Client.PutAsJsonAsync("/profiles", new { activeProfileId = "default" });
+        putResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -333,7 +318,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     }
 
     [Fact]
-    public async Task LegacySpotifyControlProfile_ResumesOnRoundStart_AndPausesOnDeath()
+    public async Task UnregisteredActionMapKey_DoesNotApplyPlayback()
     {
         var player = CreatePausedMockPlayer();
         using var host = CreateTestHost(
@@ -350,9 +335,9 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
         var deathResponse = await host.Client.PostAsJsonAsync("/gsi", CreatePayload(1002, 0, round: 4, phase: "live"));
         deathResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        player.PlayCalls.Should().Be(1);
+        player.PlayCalls.Should().Be(0);
         player.ResumeCalls.Should().Be(0);
-        player.PauseCalls.Should().Be(1);
+        player.PauseCalls.Should().Be(0);
     }
 
     [Fact]
@@ -417,7 +402,11 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task GsiEndpoint_ShadowMode_RoundStartTick_ResumesOnce_AndShadowReportsSafe()
     {
         var player = CreatePausedMockPlayer();
-        using var host = CreateTestHost(player);
+        using var host = CreateTestHost(
+            player,
+            appSettingsJson: BuildAppSettingsJson(
+                "http://127.0.0.1:5292",
+                musicOrchestrationShadowMode: true));
 
         await host.Client.PostAsJsonAsync("/gsi", CreatePayload(2200, 100, round: 11, phase: "freezetime"));
         var response = await host.Client.PostAsJsonAsync(
@@ -442,7 +431,11 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
     public async Task GsiEndpoint_ShadowMode_DeathTick_PausesOnce_AndShadowReportsDanger()
     {
         var player = CreatePausedMockPlayer();
-        using var host = CreateTestHost(player);
+        using var host = CreateTestHost(
+            player,
+            appSettingsJson: BuildAppSettingsJson(
+                "http://127.0.0.1:5292",
+                musicOrchestrationShadowMode: true));
 
         await host.Client.PostAsJsonAsync("/gsi", CreatePayload(2300, 100, round: 12, phase: "freezetime"));
         await host.Client.PostAsJsonAsync("/gsi", CreatePayload(2301, 100, round: 12, phase: "live"));
@@ -1096,7 +1089,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
 
     private static string BuildAppSettingsJson(
         string gsiBaseUrl,
-        bool enableSmartTrackStart = false,
         string roundStartAction = "music.control_profile",
         string deathAction = "music.control_profile",
         bool allowGsiReset = true,
@@ -1104,7 +1096,7 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
         bool enableTimeline = false,
         bool enablePlaybackObserver = false,
         int playbackObserverPollIntervalSeconds = 2,
-        bool musicOrchestrationShadowMode = true,
+        bool musicOrchestrationShadowMode = false,
         string musicProvider = "Mock")
     {
         return $$"""
@@ -1116,14 +1108,6 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
             }
           },
           "AllowedHosts": "*",
-          "Spotify": {
-            "ClientId": "",
-            "RedirectUri": "http://127.0.0.1:5292/callback",
-            "Scopes": [
-              "user-modify-playback-state",
-              "user-read-playback-state"
-            ]
-          },
           "Gsi": {
             "Method": "POST",
             "Path": "/gsi",
@@ -1145,13 +1129,9 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
             "RoundStartPhase": "live",
             "DeathCooldown": "00:00:01"
           },
-          "SpotifyVolumeDuck": {
+          "VolumeDuck": {
             "MuteVolume": 0,
             "FallbackRestoreVolume": 50
-          },
-          "SmartTrackStart": {
-            "Enabled": {{(enableSmartTrackStart ? "true" : "false")}},
-            "PreloadOnStartup": true
           },
           "Runtime": {
             "Mode": "{{runtimeMode}}"
@@ -1186,8 +1166,8 @@ public sealed class GsiHostIntegrationTests : IClassFixture<WebApplicationFactor
 
     private static string BuildObserverEnabledIntentCaptureAppSettingsJson(string gsiBaseUrl)
     {
-        // Mirrors --mvp (intent_capture + timeline) and turns the playback state observer ON
-        // with a 1-second poll so integration tests can observe transitions quickly.
+        // Mirrors --intent-capture (intent_capture + timeline + observer) with a 1-second poll
+        // so integration tests can observe transitions quickly.
         return BuildAppSettingsJson(
             gsiBaseUrl,
             runtimeMode: "intent_capture",

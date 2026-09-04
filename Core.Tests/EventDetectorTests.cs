@@ -261,6 +261,6 @@ public class EventDetectorTests
 
         var safety = SafetyFacts.Unknown();
 
-        return new AdapterObservation(raw, clock, neutral, Array.Empty<TitleDomainEvent>(), safety);
+        return new AdapterObservation(raw, clock, neutral, safety);
     }
 }

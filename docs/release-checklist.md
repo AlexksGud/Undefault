@@ -13,7 +13,7 @@ The product MVP after [2026-08-14](product-pivot-2026-08-14.md) is Tauon automat
 
 ## Target smoke (after PIVOT-1–8)
 
-Launch **without `--mvp`**. `--mvp` is intent_capture observe+record and does not run `music.control_profile`.
+Launch **without `--intent-capture`**. `--mvp` is rejected at startup. `--intent-capture` is leftover observe+record and does not run `music.control_profile`.
 
 Existing `control-profiles.json` with duck/restore is **not** auto-migrated; the host warns if the active profile is not `round_start=resume` / `death=pause`.
 
@@ -21,7 +21,7 @@ Keep the host running **longer than 2 minutes** during smoke. The previous named
 
 ### Tauon running
 
-- [ ] Host starts with `Music:Provider=Tauon` (default), no `--mvp`.
+- [ ] Host starts with `Music:Provider=Tauon` (default), no `--intent-capture`.
 - [ ] `GET http://127.0.0.1:5292/status` → 200. Use `musicProvider` / `musicPlayerAvailable` / `playbackState`. Do not treat leftover Spotify fields as Tauon proof.
 - [ ] Simulator (or CS2) emits `round_start` → Tauon resumes (`/api1/play` if paused/stopped). Watch `Playback resume` and Tauon logs, not leftover Spotify.
 - [ ] `death` → Tauon pauses (`/api1/pause`). Watch `Playback pause`.
@@ -38,4 +38,4 @@ Keep the host running **longer than 2 minutes** during smoke. The previous named
 
 - [ ] `--quick` or `Music:Provider=Mock` runs the same event→action flow without Tauon.
 
-Do not treat `--mvp` (intent_capture observe) as the product demo.
+Do not treat `--intent-capture` (observe) as the product demo. `--mvp` is rejected at startup.

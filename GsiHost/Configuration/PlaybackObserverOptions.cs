@@ -23,7 +23,7 @@ public sealed class PlaybackObserverOptions
 
     /// <summary>Gets or sets a value indicating whether playback-state polling is active.</summary>
     /// <remarks>
-    /// Git default is <see langword="false"/> so the observer is opt-in; <c>--mvp</c> turns it on
+    /// Git default is <see langword="false"/> so the observer is opt-in; <c>--intent-capture</c> turns it on
     /// via an in-memory configuration override.
     /// </remarks>
     public bool Enabled { get; set; }

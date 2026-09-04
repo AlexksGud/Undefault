@@ -15,23 +15,6 @@ namespace Core.Tests;
 public class ProfileRoutingTests
 {
     [Fact]
-    public void MusicProfile_FindRule_UsesCaseInsensitiveEventKeys()
-    {
-        var profile = new MusicProfile(
-            "profile-1",
-            "Default",
-            new List<EventTrackRule>
-            {
-                new("custom:clutch_1v3", new List<string> { "spotify:track:aaa" })
-            });
-
-        var rule = profile.FindRule("CUSTOM:CLUTCH_1V3");
-
-        rule.Should().NotBeNull();
-        rule!.Tracks.Should().ContainSingle().Which.Should().Be("spotify:track:aaa");
-    }
-
-    [Fact]
     public void ConsoleControlProfile_FindRule_UsesCaseInsensitiveEventKeys()
     {
         var profile = new ConsoleControlProfile(
@@ -182,7 +165,7 @@ public class ProfileRoutingTests
     }
 
     [Fact]
-    public async Task MusicControlProfileAction_LegacySpotifyKey_DucksOnRoundStart_AndRestoresOnDeath()
+    public async Task MusicControlProfileAction_DucksOnRoundStart_AndRestoresOnDeath()
     {
         var player = new FakeMusicPlayer
         {
@@ -210,50 +193,27 @@ public class ProfileRoutingTests
         var action = new MusicControlProfileAction(
             playback,
             controlProfileService,
-            NullLogger<MusicControlProfileAction>.Instance,
-            MusicControlProfileAction.LegacySpotifyKey);
+            NullLogger<MusicControlProfileAction>.Instance);
 
         await action.ExecuteAsync(NormalizedEvent.RoundStart(BuildSnapshot(DateTimeOffset.UtcNow, 100, isAlive: true)));
         await action.ExecuteAsync(NormalizedEvent.Death(BuildSnapshot(DateTimeOffset.UtcNow.AddSeconds(1), 0, isAlive: false)));
 
         player.VolumeCalls.Should().Equal(10, 72);
-        action.Key.Should().Be(MusicControlProfileAction.LegacySpotifyKey);
+        action.Key.Should().Be(MusicControlProfileAction.CanonicalKey);
     }
 
     [Fact]
-    public async Task MusicControlProfileAction_LegacySpotifyKey_PausesAndResumesWhenConfigured()
+    public void RulesEngine_FindUnregisteredActionKeys_ReturnsMissingActionMapValues()
     {
-        var player = new FakeMusicPlayer
+        var actionMap = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
         {
-            Available = true,
-            State = new MusicPlaybackState(PlaybackStatus.Playing, Track: null, VolumePercent: 55)
+            [EventKeys.RoundStart] = new[] { "music.control_profile" },
+            [EventKeys.Death] = new[] { "spotify.control_profile" }
         };
-        var controlProfileService = new FakeControlProfileService(new ConsoleControlProfilesConfig(
-            "console-default",
-            new List<ConsoleControlProfile>
-            {
-                new("console-default", "Console Default", new List<EventControlRule>
-                {
-                    new(EventKeys.RoundStart, MusicControlCommands.Pause),
-                    new(EventKeys.Death, MusicControlCommands.Resume)
-                })
-            }));
-        var playback = new MusicPlaybackControlCoordinator(
-            player,
-            Options.Create(new VolumeDuckOptions()),
-            NullLogger<MusicPlaybackControlCoordinator>.Instance);
-        var action = new MusicControlProfileAction(
-            playback,
-            controlProfileService,
-            NullLogger<MusicControlProfileAction>.Instance,
-            MusicControlProfileAction.LegacySpotifyKey);
 
-        await action.ExecuteAsync(NormalizedEvent.RoundStart(BuildSnapshot(DateTimeOffset.UtcNow, 100, isAlive: true)));
-        await action.ExecuteAsync(NormalizedEvent.Death(BuildSnapshot(DateTimeOffset.UtcNow.AddSeconds(1), 0, isAlive: false)));
+        var missing = RulesEngine.FindUnregisteredActionKeys(actionMap, new[] { "music.control_profile" });
 
-        player.PauseCalls.Should().Be(1);
-        player.PlayCalls.Should().Be(1);
-        player.ResumeCalls.Should().Be(0);
+        missing.Should().ContainSingle().Which.Should().Be("spotify.control_profile");
     }
 
     [Fact]
@@ -419,7 +379,7 @@ public class ProfileRoutingTests
             SpectatorOrObserver: null,
             TransportIntent: TransportIntentNeutral.NoChange,
             ObservedAtUtc: timestamp);
-        return new AdapterObservation(raw, clock, neutral, Array.Empty<TitleDomainEvent>(), SafetyFacts.Unknown());
+        return new AdapterObservation(raw, clock, neutral, SafetyFacts.Unknown());
     }
 
     private sealed class CaptureAction : IEventAction

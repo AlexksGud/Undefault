@@ -23,7 +23,7 @@ Long-form documentation for UndefaultIt. The [repository README](../README.md) i
 | Document | What it covers |
 |----------|----------------|
 | [Backend architecture](backend-architecture.md) | Pipeline, HTTP API, config as implemented today |
-| [Quick launch](quick-launch.md) | Flags (`--quick`, `--mvp`) on the current host |
+| [Quick launch](quick-launch.md) | Flags (`--quick`, `--intent-capture`) on the current host |
 | [CS2 GSI events](cs2-gsi-events.md) | Practical CS2 signal space vs current mapping |
 | [CS2 GSI simulator](cs2-simulator.md) | Local scenarios that post to `POST /gsi` |
 | [Continuous integration](ci.md) | GitHub Actions build/test |
@@ -47,6 +47,13 @@ These specs stay valid for a future safety/mixer engine. They are **not** curren
 | [Ingestion spec (CS2 / Dota)](ingestion-spec-cs2-dota.md) | Snapshot extensions |
 | [Multi-adapter routing](multi-adapter-routing.md) | One host, per-title endpoints |
 | [Mandatory CS2 ingestion](mandatory-cs2-ingestion-checklist.md) | Inputs before a richer music controller |
+
+## Working notes (not product docs)
+
+| Document | What it covers |
+|----------|----------------|
+| [Editorial fixes proposal (2026-09-04)](editorial-fixes-proposal-2026-09-04.md) | Four leftover/overengineering items; revised after review |
+| [Editorial fixes review (2026-09-04)](editorial-fixes-review-2026-09-04.md) | Tech-lead review + second-pass validation; source of truth for implementation |
 
 ## Archive
 

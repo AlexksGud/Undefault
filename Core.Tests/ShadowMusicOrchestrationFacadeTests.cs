@@ -166,7 +166,6 @@ public sealed class ShadowMusicOrchestrationFacadeTests
             Raw: raw,
             Clock: clock,
             Neutral: neutral,
-            DomainEvents: Array.Empty<TitleDomainEvent>(),
             Safety: safety);
     }
 }

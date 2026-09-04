@@ -32,4 +32,4 @@ The rest of the 2026-08-14 slice still stands: no `round_end`, playlists, track-
 
 ## Historical (2026-06-28)
 
-The UND-64 exception (hotkeys/observe as end-user MVP) is **closed as product direction**. Code for `--mvp` / timeline may still exist. Treat it as legacy tester tooling unless a new issue revives it.
+The UND-64 exception (hotkeys/observe as end-user MVP) is **closed as product direction**. `--mvp` is rejected at startup. Leftover observe+record is `--intent-capture` / timeline tester tooling unless a new issue revives it.

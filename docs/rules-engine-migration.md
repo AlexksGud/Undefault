@@ -24,7 +24,7 @@ GSI ticks now cross a title adapter before legacy rule evaluation:
 `GsiProcessingService` -> `IGameAdapter<GsiPayloadDto>` -> `AdapterObservation`.
 
 `AdapterObservation.Raw` preserves the existing `GameSnapshot` path for `RulesEngine`.
-`AdapterObservation.Clock`, `NeutralContext`, `SafetyFacts`, and title domain events are the handoff for Phase A facade work. The facade should consume those adapter outputs instead of re-parsing CS2 DTOs or reading CS2-only module strings directly.
+`AdapterObservation.Clock`, `NeutralContext`, and `SafetyFacts` are the handoff for Phase A facade work. The facade should consume those adapter outputs instead of re-parsing CS2 DTOs or reading CS2-only module strings directly.
 
 ## Phased approach
 
@@ -46,9 +46,9 @@ The shadow-mode side of Phase A is now wired:
 - `Core/Music/ShadowMusicOrchestrationFacade.cs` is the default implementation. It is deterministic and side-effect free: no Spotify calls, no detector mutation, no `RulesEngine.ActionMap` changes.
 - `GsiHost/Services/GsiProcessingService.cs` invokes the facade after the existing `RulesEngine.EvaluateAsync` / `DetectAsync` call. The shadow call is synchronous and guarded by `try/catch`; a throw is logged and ignored so the legacy path is never broken.
 - Output flows into `IShadowMusicSnapshotSink` (default `InMemoryShadowMusicSnapshotSink`, bounded to 32 entries) and is exposed read-only at `GET /diagnostics/music-shadow`. This endpoint is **debug/observability surface only** — it is intentionally not user-facing product surface, and is mapped in both runtime modes for the migration window.
-- `appsettings.json` adds `MusicOrchestration:ShadowMode` (default `true`). Setting it to `false` skips the facade call and leaves the diagnostics endpoint returning `{ latest: null, recent: [] }`.
+- `appsettings.json` has `MusicOrchestration:ShadowMode` (default `false`). Setting it to `false` skips the facade call and leaves the diagnostics endpoint returning `{ latest: null, recent: [] }`.
 
-`RulesEngine.ActionMap` is **not** shrunk yet — `round_start -> spotify.control_profile` and `death -> spotify.control_profile` continue to drive Spotify side effects. Phase B will compare facade output with legacy outcomes, then remove the music keys from `ActionMap` and let the facade apply playback.
+`RulesEngine.ActionMap` currently maps `round_start` / `death` to `music.control_profile`. Do not shrink ActionMap onto the facade for the Tauon MVP.
 
 ### Phase B — Shrink `ActionMap`
 

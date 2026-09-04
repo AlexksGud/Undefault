@@ -44,7 +44,6 @@ public sealed class Cs2GameAdapter : IGameAdapter<GsiPayloadDto>
             Raw: snapshot,
             Clock: clock,
             Neutral: neutral,
-            DomainEvents: Array.Empty<TitleDomainEvent>(),
             Safety: safety);
     }
 

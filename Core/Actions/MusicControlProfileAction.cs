@@ -15,11 +15,6 @@ public sealed class MusicControlProfileAction : IEventAction
     /// </summary>
     public const string CanonicalKey = "music.control_profile";
 
-    /// <summary>
-    /// Compatibility ActionMap key used during migration.
-    /// </summary>
-    public const string LegacySpotifyKey = "spotify.control_profile";
-
     private readonly IMusicPlaybackControl _playback;
     private readonly IControlProfileService _controlProfileService;
     private readonly ILogger _logger;
@@ -30,13 +25,11 @@ public sealed class MusicControlProfileAction : IEventAction
     /// <param name="playback">The session playback coordinator.</param>
     /// <param name="controlProfileService">The control-profile store.</param>
     /// <param name="logger">The logger used when a command fails.</param>
-    /// <param name="actionKey">The ActionMap key this instance registers under.</param>
     public MusicControlProfileAction(
         IMusicPlaybackControl playback,
         IControlProfileService controlProfileService,
-        ILogger<MusicControlProfileAction> logger,
-        string actionKey = CanonicalKey)
-        : this(playback, controlProfileService, (ILogger)logger, actionKey)
+        ILogger<MusicControlProfileAction> logger)
+        : this(playback, controlProfileService, (ILogger)logger)
     {
     }
 
@@ -46,21 +39,18 @@ public sealed class MusicControlProfileAction : IEventAction
     /// <param name="playback">The session playback coordinator.</param>
     /// <param name="controlProfileService">The control-profile store.</param>
     /// <param name="logger">The logger used when a command fails.</param>
-    /// <param name="actionKey">The ActionMap key this instance registers under.</param>
     public MusicControlProfileAction(
         IMusicPlaybackControl playback,
         IControlProfileService controlProfileService,
-        ILogger logger,
-        string actionKey = CanonicalKey)
+        ILogger logger)
     {
         _playback = playback;
         _controlProfileService = controlProfileService;
         _logger = logger;
-        Key = string.IsNullOrWhiteSpace(actionKey) ? CanonicalKey : actionKey;
     }
 
     /// <inheritdoc />
-    public string Key { get; }
+    public string Key => CanonicalKey;
 
     /// <inheritdoc />
     public async Task ExecuteAsync(NormalizedEvent normalizedEvent, CancellationToken cancellationToken = default)

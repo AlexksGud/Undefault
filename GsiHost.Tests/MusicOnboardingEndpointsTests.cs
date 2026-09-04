@@ -442,7 +442,7 @@ public sealed class MusicOnboardingEndpointsTests : IClassFixture<WebApplication
             "RoundStartPhase": "live",
             "DeathCooldown": "00:00:01"
           },
-          "SpotifyVolumeDuck": {
+          "VolumeDuck": {
             "MuteVolume": 0,
             "FallbackRestoreVolume": 50
           },
@@ -456,7 +456,7 @@ public sealed class MusicOnboardingEndpointsTests : IClassFixture<WebApplication
             }
           },
           "MusicOrchestration": {
-            "ShadowMode": true
+            "ShadowMode": false
           }
         }
         """;
