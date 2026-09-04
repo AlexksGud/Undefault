@@ -1,17 +1,10 @@
 # Предложение: четыре редакционные правки
 
-**Статус:** proposal for review (не approved scope)  
-**Ревью:** [editorial-fixes-review-2026-09-04.md](editorial-fixes-review-2026-09-04.md) — читать перед реализацией  
+**Статус:** revised after review — источник правды для реализации: [editorial-fixes-review-2026-09-04.md](editorial-fixes-review-2026-09-04.md)  
 **Дата:** 2026-09-04  
 **Контекст:** tech-lead audit leftover / overengineering после product pivot (Tauon + Flow) и SMTC onboarding
 
-## Цель ревью
-
-Проверить, что четыре пункта:
-
-1. действительно мешают продолжению разработки (а не «почистить потому что попросили»);
-2. не ломают живой MVP-путь;
-3. не выходят за product boundaries (нет Spotify revival, нет live mixer wiring, нет rewrite).
+Ниже — исходные четыре пункта с пометками, что review принял, урезал или заблокировал. Не реализовывать «Сделать» из исходного текста вслепую: следовать revised scope.
 
 ## Живой продукт-путь (не трогать)
 
@@ -22,99 +15,94 @@ POST /gsi → detect → music.control_profile → IMusicPlaybackControl → IMu
 Default Flow: `round_start → resume`, `death → pause`.  
 Providers: Tauon (default), SMTC, Mock (`--quick`).
 
-## Вне scope этого предложения
+## Вне scope
 
-- Dual TFM GsiHost (нужная платформенная цена)
-- Полный delete `MusicIntent` / mixer алгебры (later-spec; см. пункт 2)
-- Полный delete `TimelineCaptureService` (Dota logging / reset ещё держат)
+- Dual TFM GsiHost
+- Полный delete `MusicIntent` / mixer алгебры
+- Полный delete `TimelineCaptureService`
+- Conditional DI / `Core/Music/Deferred/` для shadow
 - Focus-пресет как продукт
 - Новые фичи
-
-```mermaid
-flowchart LR
-  gsi[POST_gsi] --> rules[RulesEngine]
-  rules --> action[music.control_profile]
-  action --> player[IMusicPlayer]
-  gsi -.-> shadow[ShadowFacade]
-  shadow -.-> diag[diagnostics_only]
-  mvpFlag["--mvp intent_capture"] -.-> skip[skips_actions]
-```
+- Mixer → live player
 
 ---
 
 ## 1. Удалить мёртвый track-URI profile stack + orphan Spotify/SmartTrackStart config
 
-**Аргумент:** На MVP-пути это не участвует. Flow читает только [`GsiHost/control-profiles.json`](../GsiHost/control-profiles.json) через `IControlProfileService`. Параллельно живёт второй «profile»-мир (`IProfileService` → `profiles.json` → track URI), HTTP `/profiles`, плюс в [`GsiHost/appsettings.json`](../GsiHost/appsettings.json) секции `Spotify` и `SmartTrackStart` без кода-потребителя. Агенты и люди читают [`docs/backend-architecture.md`](backend-architecture.md) и думают, что STS / track profiles — текущий продукт.
+**Вердикт review:** proceed (после Linear filing).
 
-**Сделать:**
+**Аргумент:** На MVP-пути это не участвует. Flow читает только `control-profiles.json` через `IControlProfileService`. Параллельно живёт второй «profile»-мир и orphan-секции в appsettings. Docs и `.cursor/rules` всё ещё описывают STS / Spotify OAuth как текущий продукт.
 
-- Удалить `IProfileService`, [`GsiHost/Services/JsonProfileService.cs`](../GsiHost/Services/JsonProfileService.cs), track-типы в [`Core/Configuration/AppConfig.cs`](../Core/Configuration/AppConfig.cs), DI + `GET/PUT /profiles` в [`GsiHost/Program.cs`](../GsiHost/Program.cs), связанные тесты.
-- Убрать `SpotifySystemConfig` / поля Spotify из [`Core/Configuration/SystemConfig.cs`](../Core/Configuration/SystemConfig.cs) и R/W в [`GsiHost/Services/AppSettingsConfigurationService.cs`](../GsiHost/Services/AppSettingsConfigurationService.cs); вырезать секции `Spotify` и `SmartTrackStart` из appsettings (и тестовых JSON-фикстур).
-- Оставить `VolumeDuckOptions` (нужны duck/restore); при необходимости переименовать bind-секцию `SpotifyVolumeDuck` → нейтральное имя отдельным мелким шагом в том же PR или следом.
-- Подправить устаревшие упоминания в docs, которые утверждают, что STS/`/profiles` ещё живы.
+**Сделать (revised):**
 
-**Не трогать:** `music.control_profile`, `JsonControlProfileService`, Tauon/SMTC/Mock.
+- Удалить `IProfileService`, `JsonProfileService`, track-типы в `AppConfig.cs`, DI + `GET/PUT /profiles`, связанные тесты.
+- Убрать `SpotifySystemConfig` из `SystemConfig` и R/W в `AppSettingsConfigurationService` (это **wire-shape change** для `GET/PUT /config`: тело больше не `{ spotify, gsi }`). Расширить `ConfigEndpoint_DoesNotExposeUseMockSpotify`: `spotify` отсутствует.
+- `SaveAsync` уже снимает `UseMockSpotify`; так же снимать узлы `Spotify` и `SmartTrackStart` с диска при сохранении.
+- Вырезать секции `Spotify` и `SmartTrackStart` из git `appsettings.json` и тестовых фикстур.
+- Переименовать bind `SpotifyVolumeDuck` → `VolumeDuck` в том же PR. Без dual binding: code defaults (0 / 50) совпадают с shipped values; кастомный on-disk ключ отвалится на те же defaults — сказать это в PR.
+- Docs sweep с явным списком файлов, не одной фразой «привести в соответствие». Минимум: `docs/backend-architecture.md` (секции STS, `/profiles`, `spotify.control_profile` как default ActionMap, `ISpotifyPlaybackControl`); `docs/tauon-integration.md:77` (PIVOT-11 leftover — задача Done).
+- `.cursor/rules`: `core-architecture.mdc:14`, `code-reviewer.mdc:13–14,36`, **`gsihost-architecture.mdc:12`**.
 
-**Evidence (audit):** OAuth/`ISpotifyClient` уже удалены (UND-84/101). `/profiles` и track-URI не вызываются onboarding UI и не стоят в ActionMap. `SmartTrackStart` в appsettings — orphan (сервиса нет).
-
----
-
-## 2. Убрать shadow-orchestration с default hot path
-
-**Аргумент:** Overengineering рядом с MVP. `Core/Music` ≈ 1.7k LOC (~60% Core); на каждом GSI-тике при `ShadowMode: true` (default в appsettings и [`MusicOrchestrationOptions`](../GsiHost/Configuration/MusicOrchestrationOptions.cs)) вызывается facade, который **не** управляет плеером. Параллельно в Core лежат `MusicIntent` / `IMusicMixer` / coalescer **без DI**. Два рассказа об orchestration → риск «дописать facade → player» и получить второго writer (запрещено product boundaries).
-
-**Сделать:**
-
-- Default `ShadowMode = false` (options + appsettings).
-- Не регистрировать/не вызывать facade, пока shadow выключен (вызов уже за флагом в [`GsiProcessingService`](../GsiHost/Services/GsiProcessingService.cs); DI сейчас всегда есть).
-- Оставить типы + unit-тесты mixer/intent как deferred (или перенести в `Core/Music/Deferred/` без смены поведения) — **не удалять алгебру**, пока нет Linear-решения на Phase B.
-- Обновить тесты, которые предполагают shadow on by default.
-
-**Не делать:** wiring mixer → live player.
+**Не трогать:** `music.control_profile`, `JsonControlProfileService`, Tauon/SMTC/Mock, `VolumeDuckOptions` (тип).
 
 ---
 
-## 3. Убрать коллизию `--mvp` / `intent_capture` с product MVP
+## 2. Shadow-orchestration default — optional, не отдельный issue
 
-**Аргумент:** Плохое архитектурное решение с прод-ценой. [`ConsoleLaunchBootstrap`](../GsiHost/Services/ConsoleLaunchBootstrap.cs) по `--mvp` ставит `intent_capture`, включает Timeline/PlaybackObserver и **отключает** music actions (`DetectAsync` вместо `EvaluateAsync` в [`GsiProcessingService`](../GsiHost/Services/GsiProcessingService.cs)). Имя флага = продуктный термин «MVP», но эффект противоположный (observe-only). Это ~500+ LOC вечного fork + путаница в checklist/smoke.
+**Вердикт review:** superfluous as scoped. Убрать conditional DI и `Deferred/`. Default flip — опциональная двухстрочная правка, **не** гейтится UND-83.
 
-**Сделать:**
+**Не делать:** регистрацию facade только при `ShadowMode`; перенос типов в `Deferred/`; wiring mixer → player; отдельный Linear issue.
 
-- Удалить флаг `--mvp` (оставить явный `--intent-capture` если tooling ещё нужен owner’у), либо сделать `--mvp` no-op/ошибкой с текстом «use default launch for product MVP».
-- Не раздувать timeline: если observe-режим остаётся — только под `--intent-capture`, без product-имени.
-- Поправить startup checklist / [`docs/quick-launch.md`](quick-launch.md), где `--mvp` выглядит как способ «запустить MVP».
-
-**Не делать в этом пункте:** полный delete `TimelineCaptureService` (его ещё дергает Dota logging / reset) — отдельный, более рискованный выпил.
+**Если всё же flip:** `MusicOrchestrationOptions` + `appsettings.json` `ShadowMode: false` + фикстуры тестов, которые ждут default `true`.
 
 ---
 
-## 4. Снять ложную совместимость `spotify.control_profile` и пустой `DomainEvents`
+## 3. Убрать коллизию `--mvp` / product MVP
 
-**Аргумент:** Оба элемента учат неверную модель. В [`Program.cs`](../GsiHost/Program.cs) второй singleton `MusicControlProfileAction` с `LegacySpotifyKey` регистрируется «на всякий случай», хотя default ActionMap уже `music.control_profile`. `TitleDomainEvent` / `DomainEvents` на `AdapterObservation` всегда `Array.Empty` из [`Cs2GameAdapter`](../GsiHost/Adapters/Cs2GameAdapter.cs) и нигде не потребляются detector’ом — зарезервированная труба без consumer. Это не фичи, а шум границ multi-title / Spotify-эпохи.
+**Вердикт review:** proceed. Hard error на `--mvp`, не silent remove. Перед этим `--intent-capture` должен стать one-flag observe launch.
 
-**Сделать:**
+**Аргумент:** `--mvp` ставит `intent_capture`, включает Timeline/PlaybackObserver и **не исполняет** music actions. Имя флага = продуктный термин, эффект противоположный. Silent remove превратит `dotnet run -- --mvp` в live automation (хост не падает на неизвестном switch).
 
-- Убрать вторую DI-регистрацию и `LegacySpotifyKey` (и тесты alias); неизвестный action key в ActionMap остаётся no-op/log без регистрации Spotify-имени.
-- Удалить `DomainEvents` / `TitleDomainEvent` из observation contract и adapter, пока не появится реальный consumer (UND-45+).
-- Не трогать `GameAdapterRouter` diagnostics и Dota log-only endpoint.
+**Сделать (revised):**
+
+- Сначала: `--intent-capture` (или новый `--observe`) включает `Runtime:Mode=intent_capture` **и** `Timeline:Enabled` + `PlaybackObserver:Enabled` (сегодня это делает только `--mvp`).
+- Затем: `--mvp` → non-zero exit + сообщение (default launch / observe flag). Никакого player call.
+- Обновить `ConsoleLaunchSettings.IsMvpLaunch`, checklist в `Program.cs`, `PlaybackObserverOptions`, `ConsoleLaunchBootstrapTests`, `docs/quick-launch.md`, `docs/release-checklist.md`, `docs/tauon-integration.md:70`, `docs/README.md:26`, `docs/backend-architecture.md:75`, `product-boundaries.mdc`, `hotkeys-timeline.mdc`.
+- `docs/archive/` можно оставить исторический флаг.
+
+**Не делать:** полный delete `TimelineCaptureService`.
 
 ---
 
-## Порядок выполнения
+## 4. Alias `spotify.control_profile` vs пустой `DomainEvents`
 
-`1 → 4 → 2 → 3`  
-(сначала мёртвое API/config, потом alias/DomainEvents, потом shadow default, потом flag rename — меньше конфликтных диффов).
+**Вердикт review:** это два разных изменения.
 
-## Acceptance
+### 4a. `DomainEvents` / `TitleDomainEvent`
 
-- `dotnet test` зелёный
-- default launch без флагов по-прежнему делает Flow pause/resume через Mock/Tauon
-- ни один из четырёх пунктов не добавляет новых фич
-- docs, которые утверждали STS/`/profiles`/`--mvp` как текущий продукт, приведены в соответствие
+Не заблокировано PIVOT-6. Unused: `Cs2GameAdapter` всегда отдаёт empty list, detector не читает. Можно отдельным commit после пункта 1 (тесты-конструкторы `AdapterObservation` + docs `ingestion-spec-cs2-dota.md`, `rules-engine-migration.md`, `multi-adapter-routing.md`).
 
-## Вопросы ревьюеру
+### 4b. Alias `spotify.control_profile`
 
-1. Пункт 3: предпочесть hard-error на `--mvp` или silent remove + только `--intent-capture`?
-2. Пункт 2: достаточно `ShadowMode=false`, или сразу перенос mixer-типов в `Deferred/`?
-3. Пункт 1: переименовать `SpotifyVolumeDuck` в том же изменении или отдельным follow-up?
-4. Нужен ли Linear issue на каждый пункт, или один umbrella issue?
+**Заблокировано** до решения PO: roadmap PIVOT-6 явно «keep alias» и помечен Done. Git default был `spotify.control_profile` с `361afaa` до `6c21da2`; on-disk owner files могут всё ещё мапить на alias.
+
+Перед снятием регистрации: startup/ctor warning на каждый `ActionMap` ключ без зарегистрированного `IEventAction` + тест. Сейчас `RulesEngine.ExecuteActionsAsync` **молча** `continue` — не log.
+
+Когда PO одобрит: снять вторую DI-регистрацию и `LegacySpotifyKey`; обновить `docs/roadmap.md` (PIVOT-6 + Current code) и `docs/music-provider-architecture.md:113`. Не бандлить с пунктами 1–3.
+
+---
+
+## Порядок (revised)
+
+`1 → 3 → 4a DomainEvents → (2 optional) → 4b alias (после PO + ActionMap warning)`
+
+Пункты 1 и 4b оба трогают `BuildAppSettingsJson` в `GsiHostIntegrationTests` — ждать rebase.
+
+## Acceptance (amended)
+
+- `dotnet test UndefaultIt.sln` зелёный на `windows-latest`
+- default launch без флагов по-прежнему Flow pause/resume через Mock/Tauon
+- `dotnet run -- --mvp` → non-zero + сообщение; player не вызывается
+- `--intent-capture` (или `--observe`) = one-flag observe
+- host с `ActionMap` → `spotify.control_profile` пишет warning на старте (**только 4b**)
+- нет новых фич; нет Spotify provider; нет mixer → player
