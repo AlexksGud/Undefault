@@ -9,7 +9,7 @@ alwaysApply: false
 - Keep endpoints thin; move workflow logic into services.
 - Register host services in `Program.cs`, but keep domain decisions out of it.
 - CS2 setup belongs in `Cs2SetupService` and should stay config-driven.
-- Player adapters (Tauon HTTP, Spotify OAuth, mock) live in the host/adapter layer, not in Core event/rule code.
+- Player adapters (Tauon HTTP, SMTC, mock) live in the host/adapter layer, not in Core event/rule code.
 - Treat mock vs real player as configuration (`Music:Provider`). `--quick` selects Mock. Do not add a second parallel host path.
 - Keep logs short, informative, and low-noise.
 - Player failure must not crash GSI ingestion.

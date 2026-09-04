@@ -33,10 +33,8 @@ public sealed class AppSettingsConfigurationService : IConfigurationService
         try
         {
             var root = await ReadRootAsync(cancellationToken);
-            var spotify = ParseSpotify(root);
             var gsi = ParseGsi(root, _configuration);
-
-            return new SystemConfig(spotify, gsi);
+            return new SystemConfig(gsi);
         }
         finally
         {
@@ -56,16 +54,8 @@ public sealed class AppSettingsConfigurationService : IConfigurationService
         {
             var root = await ReadRootAsync(cancellationToken);
             root.Remove("UseMockSpotify");
-
-            var spotifyNode = root["Spotify"] as JsonObject ?? new JsonObject();
-            spotifyNode["ClientId"] = config.Spotify.ClientId;
-            spotifyNode["RedirectUri"] = config.Spotify.RedirectUri;
-            spotifyNode["Scopes"] = BuildStringArrayNode(config.Spotify.Scopes);
-            // UND-47: PKCE flow has no client_secret. Strip any vestigial key from
-            // legacy on-disk appsettings.json so we never round-trip it back to disk.
-            spotifyNode.Remove("ClientSecret");
-
-            root["Spotify"] = spotifyNode;
+            root.Remove("Spotify");
+            root.Remove("SmartTrackStart");
             root["Gsi"] = BuildGsiNode(config.Gsi);
 
             var json = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
@@ -88,21 +78,6 @@ public sealed class AppSettingsConfigurationService : IConfigurationService
         var content = await File.ReadAllTextAsync(_filePath, cancellationToken);
         var node = JsonNode.Parse(content);
         return node as JsonObject ?? new JsonObject();
-    }
-
-    private static SpotifySystemConfig ParseSpotify(JsonObject root)
-    {
-        var spotifyNode = root["Spotify"] as JsonObject;
-        var clientId = spotifyNode?["ClientId"]?.GetValue<string>() ?? string.Empty;
-        var redirectUri = spotifyNode?["RedirectUri"]?.GetValue<string>() ?? string.Empty;
-        var scopes = spotifyNode?["Scopes"] is JsonArray scopesArray
-            ? scopesArray
-                .Select(item => item?.GetValue<string>() ?? string.Empty)
-                .Where(item => !string.IsNullOrWhiteSpace(item))
-                .ToArray()
-            : Array.Empty<string>();
-
-        return new SpotifySystemConfig(clientId, redirectUri, scopes);
     }
 
     private static GsiConfig ParseGsi(JsonObject root, IConfiguration configuration)
@@ -130,17 +105,6 @@ public sealed class AppSettingsConfigurationService : IConfigurationService
             ["Path"] = NormalizePath(gsi.Path),
             ["Url"] = NormalizeBaseUrl(gsi.Url)
         };
-    }
-
-    private static JsonArray BuildStringArrayNode(IEnumerable<string> values)
-    {
-        var array = new JsonArray();
-        foreach (var value in values)
-        {
-            array.Add(value);
-        }
-
-        return array;
     }
 
     private static string NormalizePath(string? path)

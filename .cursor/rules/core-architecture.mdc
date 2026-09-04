@@ -11,7 +11,7 @@ alwaysApply: false
 - Prefer string event keys for routing and profile matching.
 - Keep `EventDetector` stateful and driven by options, not hardcoded behavior.
 - Playback goes through `IMusicPlayer` / `IMusicPlaybackControl`. Do not put Tauon URLs or Spotify OAuth in Core.
-- Leftover `ISpotifyClient` types remain until `PIVOT-10`; new automation must not add Spotify-only assumptions to rules/detectors.
+- Do not add Spotify-only assumptions to rules/detectors. Spotify is not a provider.
 - Add or update unit tests when changing diffing, detection, routing, or action behavior.
 
 ## Example

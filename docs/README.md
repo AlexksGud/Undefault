@@ -23,7 +23,7 @@ Long-form documentation for UndefaultIt. The [repository README](../README.md) i
 | Document | What it covers |
 |----------|----------------|
 | [Backend architecture](backend-architecture.md) | Pipeline, HTTP API, config as implemented today |
-| [Quick launch](quick-launch.md) | Flags (`--quick`, `--mvp`) on the current host |
+| [Quick launch](quick-launch.md) | Flags (`--quick`, `--intent-capture`) on the current host |
 | [CS2 GSI events](cs2-gsi-events.md) | Practical CS2 signal space vs current mapping |
 | [CS2 GSI simulator](cs2-simulator.md) | Local scenarios that post to `POST /gsi` |
 | [Continuous integration](ci.md) | GitHub Actions build/test |

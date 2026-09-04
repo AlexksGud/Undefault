@@ -48,12 +48,6 @@ builder.Services.AddSingleton<EventDetector>(sp =>
 builder.Services.AddSingleton<ISnapshotStore, InMemorySnapshotStore>();
 builder.Services.AddSingleton<IEventAction, LogEventAction>();
 builder.Services.AddSingleton<IEventAction, MusicControlProfileAction>();
-builder.Services.AddSingleton<IEventAction>(sp =>
-    new MusicControlProfileAction(
-        sp.GetRequiredService<IMusicPlaybackControl>(),
-        sp.GetRequiredService<IControlProfileService>(),
-        sp.GetRequiredService<ILogger<MusicControlProfileAction>>(),
-        MusicControlProfileAction.LegacySpotifyKey));
 builder.Services.AddSingleton<IRulesEngine, RulesEngine>();
 builder.Services.AddSingleton<IMusicOrchestrationFacade, ShadowMusicOrchestrationFacade>();
 builder.Services.AddSingleton<IShadowMusicSnapshotSink, InMemoryShadowMusicSnapshotSink>();
@@ -73,7 +67,6 @@ builder.Services.AddSingleton<IAppStateService>(sp => sp.GetRequiredService<AppS
 builder.Services.AddSingleton<IGsiResetService, GsiResetService>();
 builder.Services.AddSingleton<IConfigurationService, AppSettingsConfigurationService>();
 builder.Services.AddSingleton<IControlProfileService, JsonControlProfileService>();
-builder.Services.AddSingleton<IProfileService, JsonProfileService>();
 builder.Services.AddSingleton<ICs2SetupService, Cs2SetupService>();
 builder.Services.AddSingleton<ISnapshotModuleMapper, VitalsModuleMapper>();
 builder.Services.AddSingleton<ISnapshotModuleMapper, PositionModuleMapper>();
@@ -104,7 +97,7 @@ builder.Services.Configure<RulesEngineOptions>(
 builder.Services.Configure<EventDetectorOptions>(
     builder.Configuration.GetSection("EventDetector"));
 builder.Services.Configure<VolumeDuckOptions>(
-    builder.Configuration.GetSection("SpotifyVolumeDuck"));
+    builder.Configuration.GetSection("VolumeDuck"));
 builder.Services.Configure<GsiOptions>(
     builder.Configuration.GetSection(GsiOptions.SectionName));
 builder.Services.Configure<RuntimeOptions>(
@@ -132,7 +125,7 @@ if (!consoleLaunchSettings.SkipCs2Setup)
     await EnsureCs2SetupAsync(app);
 }
 
-await WriteConsoleStartupChecklistAsync(app, consoleLaunchSettings);
+await WriteConsoleStartupChecklistAsync(app, consoleLaunchSettings, resolvedRuntime.IsIntentCapture);
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -248,18 +241,6 @@ app.MapPost("/setup/cs2/install", async (ICs2SetupService setupService, Cancella
         : Results.BadRequest(result);
 });
 
-app.MapGet("/profiles", async (IProfileService profileService, CancellationToken cancellationToken) =>
-{
-    var profiles = await profileService.GetAsync(cancellationToken);
-    return Results.Ok(profiles);
-});
-
-app.MapPut("/profiles", async (MusicProfilesConfig profiles, IProfileService profileService, CancellationToken cancellationToken) =>
-{
-    await profileService.SaveAsync(profiles, cancellationToken);
-    return Results.NoContent();
-});
-
 // Debug-only surface for the shadow facade; intentionally mapped in both runtime modes.
 app.MapGet("/diagnostics/music-shadow", (IShadowMusicSnapshotSink sink) =>
 {
@@ -281,6 +262,7 @@ app.MapGet("/diagnostics/adapters", (IGameAdapterRouter router) =>
 _ = app.Services.GetRequiredService<AppStateService>();
 _ = app.Services.GetRequiredService<TimelineCaptureService>();
 _ = app.Services.GetRequiredService<LocalGoNoGoCounterStore>();
+_ = app.Services.GetRequiredService<IRulesEngine>();
 
 app.Run();
 
@@ -344,7 +326,8 @@ static async Task EnsureCs2SetupAsync(WebApplication app)
 
 static async Task WriteConsoleStartupChecklistAsync(
     WebApplication app,
-    ConsoleLaunchSettings consoleLaunchSettings)
+    ConsoleLaunchSettings consoleLaunchSettings,
+    bool isIntentCapture)
 {
     var setupService = app.Services.GetRequiredService<ICs2SetupService>();
     var controlProfileService = app.Services.GetRequiredService<IControlProfileService>();
@@ -384,7 +367,7 @@ static async Task WriteConsoleStartupChecklistAsync(
     Console.WriteLine("UndefaultIt console startup");
     Console.WriteLine($"- Music provider: {musicProvider}");
     Console.WriteLine($"- Quick launch mode: {(consoleLaunchSettings.IsQuickLaunch ? "yes" : "no")}");
-    Console.WriteLine($"- MVP launch (--mvp): {(consoleLaunchSettings.IsMvpLaunch ? "yes — intent_capture (observe only; music.control_profile is not executed)" : "no")}");
+    Console.WriteLine($"- Observe launch (--intent-capture): {(isIntentCapture ? "yes — detect only; music.control_profile is not executed" : "no")}");
     Console.WriteLine($"- CS2 setup: {(consoleLaunchSettings.SkipCs2Setup ? "skipped" : "attempted")}");
     Console.WriteLine($"- CS2 GSI target URL: {cs2Status?.GsiUri ?? $"{consoleLaunchSettings.GsiBaseUrl}/gsi"}");
     Console.WriteLine($"- CS2 cfg ready: {(consoleLaunchSettings.SkipCs2Setup ? "skipped" : (cs2Status?.IsReady == true ? "yes" : "no"))}{(consoleLaunchSettings.SkipCs2Setup ? string.Empty : FormatSuffix(cs2Status?.CfgPath))}");
@@ -406,7 +389,7 @@ static async Task WriteConsoleStartupChecklistAsync(
     }
     Console.WriteLine("- Edit control-profiles.json for pause/resume/duck behavior.");
     Console.WriteLine("- Open /status for GSI + IMusicPlayer state.");
-    Console.WriteLine("- Tauon smoke (PIVOT-9): default launch without --mvp; watch Tauon and Playback pause/resume logs.");
+    Console.WriteLine("- Tauon smoke (PIVOT-9): default launch without --intent-capture; watch Tauon and Playback pause/resume logs.");
     Console.WriteLine();
 }
 

@@ -17,7 +17,7 @@ Linear (workspace Undefault, project `undefault`) is the source of truth for ope
 
 ## Current code (honest)
 
-- Pipeline: CS2 GSI → adapter → detector → `RulesEngine` → `music.control_profile` (`spotify.control_profile` alias still registered; not a Spotify provider)
+- Pipeline: CS2 GSI → adapter → detector → `RulesEngine` → `music.control_profile`
 - Default rules (Flow): `round_start → resume`, `death → pause`. Focus preset: `round_start → pause`, `death → resume`. Shipped profile ids `flow` (default) and `focus`. `console-default` remaps to Flow in memory when `flow` exists.
 - Device: `IMusicPlayer` — `TauonMusicPlayer` (default), `SmtcMusicPlayer` (`Music:Provider=Smtc`, Windows TFM), `MockMusicPlayer` (`--quick`)
 - Provider resolver: `Tauon | Smtc | Mock`. Unknown throws. Blank → Tauon. Appsettings default remains Tauon.
@@ -26,9 +26,9 @@ Linear (workspace Undefault, project `undefault`) is the source of truth for ope
 - Residual: `ISmtcSessionSource` only when `Music:Provider=Smtc`. Default Tauon: `GET /music/sessions` empty, `POST /music/session` 409.
 - Local counters: `{ContentRoot}/go-no-go-counters.json` for game-triggered `IMusicPlaybackControl` only. Onboarding test pause/resume via `IMusicPlayer` are not in that file. Game session = first Applied this process, or Applied after ≥30 min idle; host restart during a match increments the session count.
 - Spotify OAuth and leftover observe client types were deleted (UND-84, UND-101). Do not add a Spotify adapter.
-- `--mvp` still means leftover `intent_capture` observe+record (canceled UND-64), not the product MVP
+- `--mvp` is rejected at startup. Leftover observe+record is `--intent-capture` (canceled UND-64), not the product MVP
 - Dota: `POST /gsi/dota` logs only (UND-80)
-- Safety/mixer: shadow diagnostics only
+- Safety/mixer: shadow diagnostics only (`MusicOrchestration:ShadowMode` default `false`)
 
 ## Approved target MVP
 
@@ -79,7 +79,7 @@ Do not redesign GSI/rules. Smallest `IMusicPlayer` only.
 
 | ID | Task | Depends | Acceptance | Status |
 |---|---|---|---|---|
-| PIVOT-6 | Canonical action `music.control_profile`; keep `spotify.control_profile` alias. Default profile `round_start → resume`, `death → pause`. | PIVOT-2 | Simulator round/death drives those commands | Done in-repo |
+| PIVOT-6 | Canonical action `music.control_profile`. Default profile `round_start → resume`, `death → pause`. The `spotify.control_profile` alias was removed; unknown ActionMap keys warn at `RulesEngine` construction. | PIVOT-2 | Simulator round/death drives those commands | Done in-repo; alias removed |
 | PIVOT-7 | Add `next` / `previous` to `MusicControlCommands` and the coordinator. | PIVOT-2, PIVOT-4 | Commands route; Tauon uses `/next` and `/back` | Done in-repo |
 
 **Non-goals:** `round_end`, victory music, playlist rules.

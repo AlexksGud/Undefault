@@ -219,22 +219,6 @@ public sealed class Cs2GameAdapterTests
         observation.Raw.Should().BeEquivalentTo(direct);
     }
 
-    [Fact]
-    public void Adapt_DomainEvents_RemainEmptyForPhase2()
-    {
-        var adapter = CreateAdapter();
-        var payload = BuildPayload(
-            providerTimestampSeconds: BaseTime.ToUnixTimeSeconds(),
-            health: 100,
-            activity: "playing",
-            round: 1,
-            phase: "live");
-
-        var observation = adapter.Adapt(payload, BaseTime);
-
-        observation.DomainEvents.Should().BeEmpty();
-    }
-
     private static Cs2GameAdapter CreateAdapter()
     {
         return new Cs2GameAdapter(CreateSnapshotMapper());

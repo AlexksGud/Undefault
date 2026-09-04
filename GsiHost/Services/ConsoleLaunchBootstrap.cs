@@ -5,7 +5,6 @@ namespace GsiHost.Services;
 public sealed record ConsoleLaunchSettings(
     string GsiBaseUrl,
     bool IsQuickLaunch,
-    bool IsMvpLaunch,
     bool SkipCs2Setup,
     IReadOnlyDictionary<string, string?> ConfigurationOverrides
 );
@@ -13,6 +12,9 @@ public sealed record ConsoleLaunchSettings(
 public static class ConsoleLaunchBootstrap
 {
     public const string DefaultGsiBaseUrl = "http://127.0.0.1:5292";
+    public const string RemovedMvpFlagMessage =
+        "--mvp is not accepted. Use the default launch for product automation (round_start resume, death pause). For leftover observe+record tooling, use --intent-capture.";
+
     private const string QuickLaunchArg = "--quick";
     private const string SkipCs2SetupArg = "--skip-cs2-setup";
     private const string IntentCaptureArg = "--intent-capture";
@@ -35,11 +37,15 @@ public static class ConsoleLaunchBootstrap
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(args);
 
+        if (HasArg(args, MvpArg))
+        {
+            throw new InvalidOperationException(RemovedMvpFlagMessage);
+        }
+
         var gsiBaseUrl = NormalizeBaseUrl(configuration["Gsi:Url"]);
 
         var requestedIntentCapture = HasArg(args, IntentCaptureArg);
         var requestedScenarioPlayback = HasArg(args, ScenarioPlaybackArg);
-        var requestedMvp = HasArg(args, MvpArg);
         var isQuickLaunch = HasArg(args, QuickLaunchArg);
         var skipCs2Setup = isQuickLaunch || HasArg(args, SkipCs2SetupArg);
 
@@ -49,32 +55,20 @@ public static class ConsoleLaunchBootstrap
             ["Music:Provider"] = ResolveMusicProvider(configuration, isQuickLaunch)
         };
 
-        if ((requestedIntentCapture || requestedMvp) && !requestedScenarioPlayback)
+        if (requestedIntentCapture && !requestedScenarioPlayback)
         {
             overrides["Runtime:Mode"] = "intent_capture";
+            overrides["Timeline:Enabled"] = "true";
+            overrides["PlaybackObserver:Enabled"] = "true";
         }
         else if (requestedScenarioPlayback)
         {
             overrides["Runtime:Mode"] = "scenario_playback";
         }
 
-        // --mvp is leftover tester tooling, not the Tauon product MVP. It implies
-        // intent_capture and turns Timeline + PlaybackObserver ON in memory so a single
-        // flag yields an observe+record host. The user controls playback with the keyboard
-        // media play/pause key; Undefault only observes and records.
-        // The git-tracked appsettings.json defaults (scenario_playback, flags false) stay
-        // intact; these overrides win at runtime via the in-memory configuration collection
-        // added in Apply.
-        if (requestedMvp)
-        {
-            overrides["Timeline:Enabled"] = "true";
-            overrides["PlaybackObserver:Enabled"] = "true";
-        }
-
         return new ConsoleLaunchSettings(
             GsiBaseUrl: gsiBaseUrl,
             IsQuickLaunch: isQuickLaunch,
-            IsMvpLaunch: requestedMvp,
             SkipCs2Setup: skipCs2Setup,
             ConfigurationOverrides: overrides);
     }

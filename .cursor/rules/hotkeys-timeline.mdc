@@ -16,7 +16,7 @@ alwaysApply: false
 
 ## Product pivot (2026-08-14)
 
-Automation via rules → `IMusicPlayer` is the product MVP. `--mvp` / `intent_capture` observe+record is legacy tester tooling, not the Tauon slice. See `product-boundaries.mdc`.
+Automation via rules → `IMusicPlayer` is the product MVP. `--intent-capture` observe+record is leftover tester tooling, not the Tauon slice. `--mvp` is rejected at startup. See `product-boundaries.mdc`.
 
 ## Historical (2026-06-28)
 

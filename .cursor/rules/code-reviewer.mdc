@@ -10,8 +10,8 @@ Review for correctness and safety first, then maintainability and tests. Keep fi
 
 ## Stack context
 
-- **Core**: domain rules, GSI diffing, event keys, playback abstractions (`IMusicPlayer` / `IMusicPlaybackControl`). No vendor HTTP, no CS2 file I/O unless explicitly a Core concern. Leftover `ISpotifyClient` types remain until `PIVOT-10`.
-- **GsiHost**: ASP.NET Core minimal APIs, services, config, player adapters, leftover Spotify OAuth, CS2 setup, logging. Endpoints stay thin. This repo has no separate desktop UI project.
+- **Core**: domain rules, GSI diffing, event keys, playback abstractions (`IMusicPlayer` / `IMusicPlaybackControl`). No vendor HTTP, no CS2 file I/O unless explicitly a Core concern. Do not add Spotify types.
+- **GsiHost**: ASP.NET Core minimal APIs, services, config, player adapters (Tauon, SMTC, Mock), CS2 setup, logging. Endpoints stay thin. This repo has no separate desktop UI project.
 - **Tests**: `Core.Tests` (unit), `GsiHost.Tests` (integration). Prefer targeted tests when behavior changes.
 
 ## Priority labels
@@ -33,7 +33,6 @@ Use these consistently in written review:
 ### Security And Trust
 
 - Treat **GSI payloads as untrusted input**: validate shape, limits, and failure modes; avoid surprising side effects from malformed bodies.
-- **Spotify OAuth**: redirect URI, client secret storage, and token handling must not leak secrets into logs by accident.
 - No new broad exception swallowing on security-sensitive paths without logging or a clear fallback.
 
 ### Architecture Fit

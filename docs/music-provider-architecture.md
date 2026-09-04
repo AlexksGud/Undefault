@@ -110,7 +110,7 @@ Game-triggered outcomes on this interface are what `{ContentRoot}/go-no-go-count
 
 Canonical: `music.control_profile`.
 
-Compatibility alias: `spotify.control_profile` (still registered; not a Spotify provider).
+Unknown ActionMap keys (including a leftover on-disk `spotify.control_profile`) warn at `RulesEngine` construction and are skipped.
 
 Control commands stay in `MusicControlCommands`: `pause` / `resume` / `duck` / `restore_volume` / `next` / `previous`.
 

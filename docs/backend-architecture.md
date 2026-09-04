@@ -1,6 +1,6 @@
 # Backend Architecture
 
-> **WARNING — mixed current vs leftover.** GSI, mapping, rules, and simulator sections below still describe the live pipeline. The **music/device path has pivoted** (`IMusicPlaybackControl` → `IMusicPlayer` → Tauon/Mock; `round_start → resume`, `death → pause`). Leftover `ISpotifyClient` types remain until `PIVOT-10` and must not be treated as the product backend; the OAuth layer behind them was deleted in UND-84.
+> **WARNING — mixed current vs leftover.** GSI, mapping, rules, and simulator sections below still describe the live pipeline. The **music/device path has pivoted** (`IMusicPlaybackControl` → `IMusicPlayer` → Tauon/Mock/SMTC; `round_start → resume`, `death → pause`). Spotify OAuth and leftover observe-client types were deleted (UND-84, UND-101). Do not treat remaining Spotify wording in older sections as the product backend.
 >
 > **Authoritative music path:**
 > - [product-pivot-2026-08-14.md](product-pivot-2026-08-14.md)
@@ -16,16 +16,16 @@ What `main` does today:
 
 - `GsiHost` is the runtime entry point
 - CS2 Game State Integration posts to the local backend
-- live playback goes through `IMusicPlayer` (Tauon default, Mock for `--quick`)
+- live playback goes through `IMusicPlayer` (Tauon default, Mock for `--quick`, SMTC when selected)
 - default gameplay automation is `round_start -> resume` and `death -> pause`
-- leftover `ISpotifyClient` types remain until `PIVOT-10` (OAuth deleted in UND-84)
+- leftover Spotify HTTP/OAuth paths are gone (UND-84, UND-101)
 - further behavior is expressed through `RulesEngine.ActionMap` and `control-profiles.json`
 
 ## High-Level Solution Shape
 
 | Project | Responsibility |
 |---|---|
-| `Core` | Domain models, event detection, rules, playback helpers (today still namespaced under `Core/Spotify`) |
+| `Core` | Domain models, event detection, rules, player-agnostic playback contracts (`Core/Music`) |
 | `GsiHost` | ASP.NET Minimal API host, config persistence, CS2 setup, console bootstrap, JSON-backed profile files—the product entry point for real use |
 
 The backend is intentionally layered so that gameplay ingestion, event normalization, routing, and playback remain distinct concerns.
@@ -54,13 +54,12 @@ Startup order:
 
 1. `WebApplication.CreateBuilder(args)`
 2. `ConsoleLaunchBootstrap.Apply(builder, args)`
-3. DI registration for mapping, detection, rules, actions, services, and Spotify
+3. DI registration for mapping, detection, rules, actions, services, and `IMusicPlayer`
 4. options binding from `appsettings.json`
 5. host build
 6. automatic CS2 setup via `EnsureCs2SetupAsync()`
-7. Smart Track Start warm-up via `WarmSmartTrackStartAsync()`
-8. console startup checklist output
-9. endpoint mapping and `app.Run()`
+7. console startup checklist output
+8. endpoint mapping and `app.Run()`
 
 This matters because the console bootstrap injects runtime overrides before most of the host is configured.
 
@@ -72,13 +71,13 @@ Its current responsibilities:
 
 - normalize the GSI base URL
 - resolve `Music:Provider` from `--quick` and configuration
-- resolve the runtime mode from `--intent-capture` / `--scenario-playback` / `--mvp`
+- resolve the runtime mode from `--intent-capture` / `--scenario-playback`
+- reject `--mvp` with a hard error (use default launch or `--intent-capture`)
 - apply config overrides in memory without mutating git-tracked files
 - bind Kestrel to the chosen local URL with `builder.WebHost.UseUrls(...)`
 
 UND-84 deleted the credential half of this shim. There is no credential
-resolution, no interactive prompt, and no encrypted secret store; the leftover
-`ISpotifyClient` always resolves to `MockSpotifyClient`.
+resolution, no interactive prompt, and no encrypted secret store.
 
 ## Configuration And File Model
 
@@ -86,36 +85,31 @@ The backend uses several distinct configuration surfaces rather than one large s
 
 | File / surface | Role |
 |---|---|
-| `GsiHost/appsettings.json` | host runtime settings, detector options, action map, Spotify client options, Smart Track Start toggle |
+| `GsiHost/appsettings.json` | host runtime settings, detector options, action map, `Music:Provider`, Tauon/SMTC, volume duck |
 | `GsiHost/control-profiles.json` | console-first music control rules like `pause`, `resume`, `duck`, `restore_volume` |
-| `profiles.json` in host content root | legacy track-routing profiles mapping `eventKey -> Spotify URI[]` |
-| `GsiHost/smart-track-starts.json` | optional Smart Track Start metadata keyed by Spotify track URI or track id |
 
 Important nuance:
 
 - `JsonControlProfileService` creates and writes a default `control-profiles.json` when the file is missing
-- `JsonSmartTrackStartService` creates and writes an empty `smart-track-starts.json` when the file is missing
-- `JsonProfileService` returns a default in-memory profile config when `profiles.json` is missing, but does not eagerly create the file on disk until something saves it
 
 ### `appsettings.json`
 
 Current top-level sections:
 
-- `Spotify`
 - `Gsi`
+- `Music`
+- `Tauon`
 - `EventDetector`
-- `SpotifyVolumeDuck`
-- `SmartTrackStart`
+- `VolumeDuck`
+- `Runtime`
 - `RulesEngine`
+- `MusicOrchestration`
 
 `AppSettingsConfigurationService` persists the editable system config surface for:
 
-- Spotify client id
-- Spotify redirect URI
-- Spotify scopes
 - GSI method/path/url
 
-It intentionally preserves an existing `Spotify.ClientSecret` value in the JSON file rather than overwriting it from API input.
+`SaveAsync` strips leftover `Spotify`, `SmartTrackStart`, and `UseMockSpotify` nodes from on-disk `appsettings.json` if they are still present.
 
 ### Console Control Profiles
 
@@ -142,43 +136,13 @@ Supported commands are:
 
 Default file content:
 
-- active profile `console-default`
-- `round_start -> duck 0`
-- `death -> restore_volume`
+- active profile `flow`
+- `round_start -> resume`
+- `death -> pause`
 
-`SpotifyControlProfileAction` applies those commands through `ISpotifyPlaybackControl` (`SpotifyPlaybackControlCoordinator`) so duck, restore, pause, and resume stay consistent across events. The coordinator reads **`VolumeDuckOptions`** (bound from the unchanged `SpotifyVolumeDuck` configuration section): a `duck` rule without `VolumePercent` uses `MuteVolume` as the target, and `restore_volume` falls back to `FallbackRestoreVolume` when no pre-duck volume was saved.
+`MusicControlProfileAction` applies those commands through `IMusicPlaybackControl` (`MusicPlaybackControlCoordinator`). The coordinator reads **`VolumeDuckOptions`** (bound from `VolumeDuck`): a `duck` rule without `VolumePercent` uses `MuteVolume` as the target, and `restore_volume` falls back to `FallbackRestoreVolume` when no pre-duck volume was saved.
 
-### Legacy Track Profiles
-
-`Core/Configuration/AppConfig.cs` defines the older track-routing model:
-
-- `MusicProfilesConfig`
-- `MusicProfile`
-- `EventTrackRule`
-
-This path is still available for URI-based playback scenarios and for future profile-driven track starts. It is not the default console flow right now.
-
-### Smart Track Start Metadata
-
-`Core/Configuration/SmartTrackStartsConfig.cs` defines the optional smart-start catalog:
-
-- `SmartTrackStartsConfig`
-- `SmartTrackStartEntry`
-
-Each entry can match by:
-
-- `TrackUri`
-- `TrackId`
-
-Each entry carries:
-
-- `StartPositionMs`
-- optional `CueLabel`
-
-`SmartTrackStartOptions` currently exposes:
-
-- `Enabled`
-- `PreloadOnStartup`
+Track-URI `profiles.json` / Smart Track Start files and services are **deleted**. They are not a current product path.
 
 ## HTTP Surface
 
@@ -198,8 +162,6 @@ The backend is currently a Minimal API host with these main routes:
 | `PUT` | `/config` | save editable system config |
 | `GET` | `/control-profiles` | read console control profiles |
 | `PUT` | `/control-profiles` | save console control profiles |
-| `GET` | `/profiles` | read legacy track profiles |
-| `PUT` | `/profiles` | save legacy track profiles |
 | `GET` | `/setup/cs2/status` | read CS2 setup state |
 | `POST` | `/setup/cs2/install` | install or update the CS2 GSI cfg |
 | `GET` | `/diagnostics/music-shadow` | debug-only inspection of the Phase A music orchestration facade shadow output (UND-22) |
@@ -312,7 +274,7 @@ Current behavior:
 
 That execution order matters. If multiple actions are mapped to one event, they run in the order listed in `RulesEngine.ActionMap`.
 
-**`ActionMap` is the source of truth for which `IEventAction` runs for each normalized event.** Console-first music behavior then depends on mapping those events to `spotify.control_profile` and editing `control-profiles.json` (or on legacy `spotify.profile` / `spotify.volume_duck` if you configure those keys instead).
+**`ActionMap` is the source of truth for which `IEventAction` runs for each normalized event.** Console-first music behavior maps `round_start` / `death` to `music.control_profile` and edits `control-profiles.json`. Unknown ActionMap keys warn at `RulesEngine` construction and are skipped.
 
 ### Music orchestration facade — shadow mode (Phase A)
 
@@ -325,7 +287,7 @@ UND-22 introduced `IMusicOrchestrationFacade.EvaluateShadow(AdapterObservation)`
 
 The bounded ring (`InMemoryShadowMusicSnapshotSink`, 32 entries) is exposed read-only at `GET /diagnostics/music-shadow` for parity inspection between facade output and the legacy `round_start -> duck` / `death -> restore_volume` outcomes. The endpoint is debug surface, not user-facing product behavior, and is mapped in both runtime modes during the migration window.
 
-`appsettings.json` adds `MusicOrchestration:ShadowMode` (default `true`). When `false`, `GsiProcessingService` skips the facade entirely and the diagnostics endpoint returns `{ latest: null, recent: [] }`. See [rules-engine-migration.md](rules-engine-migration.md) for the historical Phase A shadow path. Do not implement Phase B/C for the Tauon MVP; [roadmap.md](roadmap.md) `PIVOT-*` is authoritative.
+`appsettings.json` has `MusicOrchestration:ShadowMode` (default `false`). When `false`, `GsiProcessingService` skips the facade entirely and the diagnostics endpoint returns `{ latest: null, recent: [] }`. See [rules-engine-migration.md](rules-engine-migration.md) for the historical Phase A shadow path. Do not implement Phase B/C for the Tauon MVP; [roadmap.md](roadmap.md) `PIVOT-*` is authoritative.
 
 ## Current Default Runtime Behavior
 
@@ -333,20 +295,20 @@ This is **what `main` does today**. Approved target is `resume` / `pause` via Ta
 
 The default `GsiHost/appsettings.json` routes:
 
-- `round_start -> spotify.control_profile`
-- `death -> spotify.control_profile`
+- `round_start -> music.control_profile`
+- `death -> music.control_profile`
 
 The default `control-profiles.json` then applies:
 
-- `round_start -> duck` with target volume `0`
-- `death -> restore_volume`
+- `round_start -> resume`
+- `death -> pause`
 
 So the verified console-first baseline is:
 
 - round goes live
-- backend ducks Spotify
+- backend resumes the user's player
 - player dies
-- backend restores the previous volume
+- backend pauses the user's player
 
 ## Playback And Spotify Actions
 
@@ -494,13 +456,7 @@ The backend currently persists three distinct data domains.
 
 `JsonControlProfileService` owns `control-profiles.json`.
 
-### Legacy Track Profiles
-
-`JsonProfileService` owns `profiles.json`.
-
-### Smart Track Start Metadata
-
-`JsonSmartTrackStartService` owns `smart-track-starts.json`.
+Track-URI `profiles.json` and Smart Track Start files are not present.
 
 ## Dependency Injection Summary
 
@@ -509,12 +465,10 @@ The important service groups registered in `GsiHost/Program.cs` are:
 - snapshot mapping services
 - diffing and rules services
 - app state and processing services
-- configuration and profile services
+- configuration and control-profile services
 - CS2 setup service
-- Spotify action implementations
-- playback policy and playback helper services
-- Smart Track Start service
-- real or mock Spotify client
+- `IMusicPlayer` (Tauon, SMTC, or Mock)
+- playback coordinator and host decorators
 
 ## Console Checklist
 
@@ -577,8 +531,6 @@ If you need to reason about the backend quickly:
 - gameplay enters through `/gsi`
 - `RulesEngine` runs diffing, then `EventDetector`, then action dispatch
 - `RulesEngine.ActionMap` decides which `IEventAction` implementations run
-- the default console path maps key events to `spotify.control_profile` and uses `control-profiles.json` for commands
-- track-based playback still exists through `profiles.json` and `spotify.profile`
-- Smart Track Start is optional and only enhances track starts
-- CS2 setup and Spotify auth are both designed to work from the console without UI dependency
+- the default console path maps key events to `music.control_profile` and uses `control-profiles.json` for commands
+- CS2 setup is designed to work from the console without a desktop UI
 - there is no YAML or separate scenario host project; behavior is JSON config plus Core/GsiHost code

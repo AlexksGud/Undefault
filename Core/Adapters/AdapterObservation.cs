@@ -7,5 +7,4 @@ public sealed record AdapterObservation(
     GameSnapshot Raw,
     GameClockSnapshot Clock,
     NeutralContext Neutral,
-    IReadOnlyList<TitleDomainEvent> DomainEvents,
     SafetyFacts Safety);

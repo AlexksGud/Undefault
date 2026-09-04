@@ -82,62 +82,50 @@ public sealed class ConsoleLaunchBootstrapTests
     }
 
     [Fact]
-    public void Prepare_MvpFlag_SetsIntentCaptureAndEnablesAllFeatureFlagsInMemory()
+    public void Prepare_MvpFlag_Throws()
     {
-        // UND-66 / UND-78: --mvp is the one-command MVP launch. It implies intent_capture
-        // and turns Timeline / PlaybackObserver ON via in-memory overrides, without
-        // flipping the git-tracked appsettings default. The user controls playback via
-        // the keyboard media play/pause key; Undefault only observes and records.
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["Gsi:Url"] = "http://127.0.0.1:5292"
         });
 
-        var settings = ConsoleLaunchBootstrap.Prepare(configuration, new[] { "--mvp" });
+        var act = () => ConsoleLaunchBootstrap.Prepare(configuration, new[] { "--mvp" });
 
-        settings.IsMvpLaunch.Should().BeTrue();
-        settings.ConfigurationOverrides["Runtime:Mode"].Should().Be("intent_capture");
-        settings.ConfigurationOverrides["Timeline:Enabled"].Should().Be("true");
-        settings.ConfigurationOverrides["PlaybackObserver:Enabled"].Should().Be("true");
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage(ConsoleLaunchBootstrap.RemovedMvpFlagMessage);
     }
 
     [Fact]
-    public void Prepare_MvpFlag_WithScenarioPlayback_KeepsScenarioPlaybackModeButLeavesFlagsOn()
+    public void Prepare_IntentCapture_SetsObserveFlagsInMemory()
     {
-        // Explicit --scenario-playback wins for the runtime mode; --mvp still turns
-        // the feature flags on (they are no-ops outside intent_capture).
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["Gsi:Url"] = "http://127.0.0.1:5292"
         });
 
-        var settings = ConsoleLaunchBootstrap.Prepare(
-            configuration,
-            new[] { "--mvp", "--scenario-playback" });
+        var settings = ConsoleLaunchBootstrap.Prepare(configuration, new[] { "--intent-capture" });
 
-        settings.IsMvpLaunch.Should().BeTrue();
-        settings.ConfigurationOverrides["Runtime:Mode"].Should().Be("scenario_playback");
-        settings.ConfigurationOverrides["Timeline:Enabled"].Should().Be("true");
-        settings.ConfigurationOverrides["PlaybackObserver:Enabled"].Should().Be("true");
-    }
-
-    [Fact]
-    public void Prepare_MvpFlag_KeepsTauonMusicProvider_AndPreservesIntentCaptureFlagBehavior()
-    {
-        // --mvp is leftover tester tooling; it must not change the music provider.
-        var configuration = BuildConfiguration(new Dictionary<string, string?>
-        {
-            ["Gsi:Url"] = "http://127.0.0.1:5292"
-        });
-
-        var settings = ConsoleLaunchBootstrap.Prepare(
-            configuration,
-            new[] { "--mvp", "--intent-capture" });
-
-        settings.IsMvpLaunch.Should().BeTrue();
         settings.ConfigurationOverrides["Runtime:Mode"].Should().Be("intent_capture");
+        settings.ConfigurationOverrides["Timeline:Enabled"].Should().Be("true");
         settings.ConfigurationOverrides["PlaybackObserver:Enabled"].Should().Be("true");
         settings.ConfigurationOverrides["Music:Provider"].Should().Be("Tauon");
+    }
+
+    [Fact]
+    public void Prepare_IntentCapture_WithScenarioPlayback_KeepsScenarioPlaybackAndDoesNotEnableObserveFlags()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Gsi:Url"] = "http://127.0.0.1:5292"
+        });
+
+        var settings = ConsoleLaunchBootstrap.Prepare(
+            configuration,
+            new[] { "--intent-capture", "--scenario-playback" });
+
+        settings.ConfigurationOverrides["Runtime:Mode"].Should().Be("scenario_playback");
+        settings.ConfigurationOverrides.ContainsKey("Timeline:Enabled").Should().BeFalse();
+        settings.ConfigurationOverrides.ContainsKey("PlaybackObserver:Enabled").Should().BeFalse();
     }
 
     private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
